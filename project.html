@@ -234,11 +234,11 @@
               </div>
               <div class="modal-body" style="padding:	2rem; padding-top: 0; padding-bottom: 0;">
                 <ul class="navbar-nav responsive me-auto mt-2 mt-lg-0">
-                  <li class="nav-item active">
-                    <a class="nav-link" href="./index.html" style="color: #E7E7E8;">Home</a>
-                  </li>
                   <li class="nav-item">
-                    <a class="nav-link" href="./project.html">Project</a>
+                    <a class="nav-link" href="./index.html">Home</a>
+                  </li>
+                  <li class="nav-item active">
+                    <a class="nav-link" href="./project.html" style="color: #E7E7E8;">Project</a>
                   </li>
                   <li class="nav-item">
                     <a class="nav-link" href="./certification.html">Certification</a>
@@ -254,11 +254,11 @@
 
         <div class="collapse navbar-collapse" id="navbarTogglerDemo">
           <ul class="navbar-nav me-auto mt-2 mt-lg-0">
-            <li class="nav-item active">
-              <a class="nav-link" href="./index.html" style="color: #E7E7E8;">Home</a>
-            </li>
             <li class="nav-item">
-              <a class="nav-link" href="./project.html">Project</a>
+              <a class="nav-link" href="./index.html">Home</a>
+            </li>
+            <li class="nav-item active">
+              <a class="nav-link" href="./project.html" style="color: #E7E7E8;">Project</a>
             </li>
             <li class="nav-item">
               <a class="nav-link" href="./certification.html">Certification</a>
@@ -270,27 +270,6 @@
         </div>
       </nav>
 
-      <div>
-        <div class="mx-auto d-flex flex-lg-row flex-column hero">
-          <!-- Left Column -->
-          <div
-            class="left-column d-flex flex-lg-grow-1 flex-column align-items-lg-start text-lg-start align-items-center text-center">
-            <h1 class="title-text-big">Ronaldo<br class=" d-lg-block d-none"> Katriel Widjaja</h1>
-            <div class="d-flex flex-sm-row flex-column align-items-center mx-lg-0 mx-auto justify-content-center gap-3">
-                <div class="d-flex align-items-center text-caption">
-                  I am an IT student who interested to keep learning. Seeking a beginner’s role to explore and enhance my technical knowledge gained at University in the last four years.
-                </div>
-              </button>
-            </div>
-          </div>
-          <!-- Right Column -->
-          <div class="right-column text-center d-flex justify-content-lg-end justify-content-center pe-0">
-            <img id="img-fluid" class="h-75 mw-100"
-              src="./img/raka-profile.png" alt="">
-          </div>
-
-        </div>
-      </div>
     </div>
 
 
@@ -371,7 +350,24 @@
         border: none;
       }
 
+      .content-2-3 .btn-language {
+        font: 700 1rem/1.5rem Poppins, sans-serif;
+        background-color: #EAEE4E;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        width: 100%;
+        border-radius: 0.75rem;
+        margin-bottom: 1.25rem;
+        border: none;
+      }
+
       .content-2-3 .btn-card:hover {
+        --tw-shadow: inset 0 0px 25px 0 rgba(20, 20, 50, 0.7);
+        box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
+          var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+      }
+
+      .content-2-3 .btn-language:hover {
         --tw-shadow: inset 0 0px 25px 0 rgba(20, 20, 50, 0.7);
         box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
           var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
@@ -379,15 +375,16 @@
 
       .content-2-3 .btn-outline {
         font: 400 1rem/1.5rem Poppins, sans-serif;
-        color: #57578e;
-        border: 1px solid #57578e;
+        color: white;
+        border: 2px solid white;
         padding-top: 1rem;
         padding-bottom: 1rem;
         width: 100%;
         border-radius: 0.75rem;
+        background-color: green;
       }
 
-      .content-2-3 .btn-outline:hover {
+      .content-2-3 {
         border: 1px solid #ffffff;
         color: #ffffff;
       }
@@ -468,6 +465,10 @@
           width: 95%;
           float: right;
         }
+        .content-2-3 .btn-language {
+          width: 95%;
+          float: right;
+        }
       }
 
       @media (max-width: 980px) {
@@ -484,53 +485,272 @@
         </p>
       </div>
 
-      <div class="grid-padding text-center">
-        <div class="row">
-          <div class="col-lg-4 column spacing">
-            <div class="icon">
-              <img class= "logo-icon" src="./img/html-5.svg"
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/kotlin.png" style="width:10rem;height:10rem;"
                 alt="" />
             </div>
-            <h3 class="icon-title text-white"><a class="none" href="./html.html">HTML</a></h3>
-          </div>
-          <div class="col-lg-4 column spacing">
-            <div class="icon">
-              <img class= "logo-icon" src="./img/sql.svg"
-                alt="" />
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                SympTap
+              </h3>
+              <p class="card-caption">
+                Health App with Kotlin
+              </p>
             </div>
-            <h3 class="icon-title text-white"><a class="none" href="./sql.html">SQL</a></h3>
-          </div>
-          <div class="col-lg-4 column spacing">
-            <div class="icon">
-              <img class= "logo-icon" src="./img/ruby.svg"
-                alt="" />
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/SympTap-Android" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">Kotlin</button>
             </div>
-            <h3 class="icon-title text-white"><a class="none" href="./ruby.html">Ruby</a></h3>
-          </div>
-          <div class="col-lg-4 column spacing">
-            <div class="icon">
-              <img class= "logo-icon" src="./img/css-3.svg"
-                alt="" />
-            </div>
-            <h3 class="icon-title text-white"><a class="none" href="./css.html">CSS</a></h3>
-          </div>
-          <div class="col-lg-4 column spacing">
-            <div class="icon">
-              <img class= "logo-icon" src="./img/kotlin.png"
-                alt="" />
-            </div>
-            <h3 class="icon-title text-white"><a class="none" href="./kotlin.html">Kotlin</a></h3>
-          </div>
-          <div class="col-lg-4 column spacing">
-            <div class="icon">
-              <img class= "logo-icon" src="./img/java.svg"
-                alt="" />
-            </div>
-            <h3 class="icon-title text-white"><a class="none" href="./java.html">Java</a></h3>
           </div>
         </div>
       </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/php.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Website Sistech
+              </h3>
+              <p class="card-caption">
+                Website for Sistech UPH
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/Web-Sistech" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">HTML, CSS, PHP, & Javascript</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/html-5.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Responsive Website
+              </h3>
+              <p class="card-caption">
+                There are 4 Websites inside this Project
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/Responsive-Website" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">HTML, CSS, & Javascript</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/ruby.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Order Food and Drink
+              </h3>
+              <p class="card-caption">
+                Order and Calculate the price for the Food and Drink
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/Food-Order" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">Ruby</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/sql.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Dunia Wadidaw
+              </h3>
+              <p class="card-caption">
+                Make Profit Report with SQL
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/dunia-wadidaw-sql" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">SQL</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/html-5.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Cartoon Hero
+              </h3>
+              <p class="card-caption">
+                My First Website
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/Cartoon-Hero" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">HTML & CSS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/java.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Chat Room
+              </h3>
+              <p class="card-caption">
+                Chat Room with Client and Server using Socket
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/chat-room-java" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">Java</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/javascript.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Pong Game
+              </h3>
+              <p class="card-caption">
+                Pong Game with Javascript
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/pong-with-javascript" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">Javascript</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/java.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Plant vs Zombie
+              </h3>
+              <p class="card-caption">
+                Make Plant vs Zombie using Java
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/plant-vs-zombie" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">Java</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/sql.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                Calculate Profit
+              </h3>
+              <p class="card-caption">
+                Calculate the Profit with SQL
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/Calculate-Profit" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">SQL</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-block">
+        <div class="card">
+          <div class="d-flex flex-lg-row flex-column align-items-center">
+            <div class="me-lg-3">
+              <img
+                src="./img/java.svg" style="width:10rem;height:10rem;"
+                alt="" />
+            </div>
+            <div class="flex-grow-1 text-lg-start text-center card-text">
+              <h3 class="card-title text-white">
+                AI for Sequence Game
+              </h3>
+              <p class="card-caption">
+                Make AI for Sequence Game
+              </p>
+            </div>
+            <div class="card-btn-space">
+              <a href="https://github.com/rakawidjaja169/ai-for-sequence-game" target="_blank"><button class="btn btn-card text-white">Github</button></a>
+              <button class="btn btn-language text-black">Java</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
+
   </section><section class="h-100 w-100" style="box-sizing: border-box; background-color: #141432">
 		<style>
 			@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
