@@ -1,9 +1,9 @@
 export const projects = [
   {
-    slug: "cloud-management-platform",
-    title: "Cloud Management Platform",
+    slug: "online-admission-sdh",
+    title: "Online Admission SDH",
     description:
-      "A comprehensive platform for managing cloud resources across multiple providers with cost optimization features.",
+      "The SDH online registration page allows prospective students to create an account, complete a detailed admissions form, make and confirm payments, upload required documents, and receive verification notifications via email/WhatsApp.",
     thumbnail: "/placeholder.svg?height=600&width=800",
     gallery: [
       "/placeholder.svg?height=600&width=800",
@@ -12,26 +12,28 @@ export const projects = [
       "/placeholder.svg?height=600&width=800",
     ],
     content:
-      "The Cloud Management Platform is a comprehensive solution designed to simplify the management of cloud resources across multiple providers. It provides a unified interface for monitoring, provisioning, and optimizing cloud infrastructure, helping organizations reduce costs and improve operational efficiency.",
+      "The Sekolah Dian Harapan (SDH) online registration portal guides users through a step-by-step enrollment process: starting with account creation and email verification, then logging in to complete personal and parental details, school history, and purchase a registration form. Payment is made through a secure payment gateway, which automatically verifies transactions. After successful payment, users receive both WhatsApp and email notifications, prompting them to complete an electronic form and upload supporting documents (such as a birth certificate, family card, report card, and photos), all within a secure system designed to streamline admissions for SDH’s 17 campuses across Indonesia.",
     features: [
-      "Multi-cloud resource management",
-      "Cost optimization and recommendations",
-      "Automated scaling and provisioning",
-      "Comprehensive monitoring and alerts",
-      "Role-based access control",
-    ],
+      "Account creation via Sign Up (name, email, password)",
+      "WhatsApp/Email verification link sent to activate account",
+      "Secure login to access the registration dashboard",
+      "Online form for student, parents, and school background information",
+      "Purchase registration form through integrated payment gateway",
+      "Automatic payment verification after successful transaction",
+      "WhatsApp and Email notifications for payment and registration status",
+      "Electronic form completion after payment confirmation",
+      "Document upload for birth certificate, family card, report card, and photos",
+      "Dashboard to track registration progress and submission status"
+    ],      
     tools: [
-      { name: "React", logo: "/placeholder.svg?height=40&width=40" },
-      { name: "TypeScript", logo: "/placeholder.svg?height=40&width=40" },
-      { name: "Node.js", logo: "/placeholder.svg?height=40&width=40" },
-      { name: "GraphQL", logo: "/placeholder.svg?height=40&width=40" },
-      { name: "Docker", logo: "/placeholder.svg?height=40&width=40" },
-      { name: "Kubernetes", logo: "/placeholder.svg?height=40&width=40" },
+      { name: "CodeIgniter", logo: "/codeigniter.png?height=40&width=40" },
+      { name: "MySQL", logo: "/mysql.svg?height=40&width=40" },
+      { name: "PHP", logo: "/php.png?height=40&width=40" },
     ],
-    liveUrl: "https://example.com/cloud-platform",
-    githubUrl: "https://github.com/johndoe/cloud-platform",
-    timeline: "Jan 2022 - Dec 2022",
-    categories: ["Cloud Computing", "DevOps", "Enterprise Software"],
+    liveUrl: "https://sdh.or.id/registrasi/",
+    githubUrl: "",
+    timeline: "December 2022 - Present",
+    categories: ["Web Development", "Enterprise Software"],
   },
   {
     slug: "ai-powered-analytics",

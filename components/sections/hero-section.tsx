@@ -53,7 +53,7 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            Hi, I'm <span className="text-orange-500">John Doe</span>
+            Hi, I'm <span className="text-orange-500">Ronaldo Katriel Widjaja</span>
           </motion.h1>
 
           <motion.h2
@@ -62,7 +62,7 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            Software Engineer
+            Software Engineer & Project Lead
           </motion.h2>
 
           <motion.p
@@ -150,7 +150,7 @@ export function HeroSection() {
               }}
               className="absolute inset-0 rounded-full"
             />
-            <Image src="/placeholder.svg?height=320&width=320" alt="John Doe" fill className="object-cover" priority />
+            <Image src="/placeholder.svg?height=320&width=320" alt="Ronaldo Katriel Widjaja" fill className="object-cover" priority />
           </div>
         </motion.div>
       </div>

@@ -12,28 +12,66 @@ import { HoverCard } from "@/components/ui/hover-card"
 export function ExperienceSection() {
   const experienceData = [
     {
-      title: "Senior Software Engineer",
-      company: "Google",
-      period: "2020 - Present",
-      description:
-        "Lead developer for Google Cloud Platform services. Architected and implemented scalable microservices using Kubernetes and Docker. Improved system performance by 40% through optimization and refactoring.",
-      skills: ["React", "Node.js", "Kubernetes", "Go", "Cloud Architecture"],
+      title: "Software Engineer & Project Lead",
+      company: "Yayasan Pendidikan Pelita Harapan - SDH Head Office",
+      period: "March 2023 - Present",
+      description: [
+        "Defined product roadmaps and led sprint planning for 8+ internal applications, including Data Warehouse, Ticketing System, Asset Management, and Digital Asset Management, aligning delivery with institutional priorities.",
+        "Prioritized features using the MoSCoW framework, balancing stakeholder urgency with engineering capacity to ensure timely, high-impact releases.",
+        "Launched a new ticketing system with complete logging and reporting, replacing manual tracking and enabling reliable post-launch evaluation and continuous improvement.",
+        "Spearheaded delivery of a DRM-enabled Digital Asset Management System with bandwidth-aware compression, improving content security and performance across devices.",
+        "Mentored junior developers through code reviews and pair programming, improving team velocity and code quality.",
+        "Collaborated with cross-functional teams to gather requirements and translate business needs into technical specifications.",
+        "Implemented automated testing and CI/CD pipelines, reducing deployment time by 30% and improving release reliability."
+      ],
+      skills: ["Vue.js", "React.js", "Node.js", "MySQL", "SQL Server", "Docker", "Laravel", "Project Management", "Agile Methodologies"],
     },
     {
-      title: "Software Engineer",
-      company: "Microsoft",
-      period: "2018 - 2020",
-      description:
-        "Worked on the Azure team developing cloud infrastructure services. Implemented CI/CD pipelines and automated testing frameworks. Contributed to open-source projects and internal developer tools.",
-      skills: ["TypeScript", "C#", "Azure", "DevOps", "CI/CD"],
+      title: "Software Engineer (Full Stack)",
+      company: "Yayasan Pendidikan Pelita Harapan - SDH Head Office",
+      period: "March 2022 - February 2023",
+      description: [
+        "Developed and launched core internal platforms—including Online Admission, LMS, and School Management System—used by thousands across departments, by translating stakeholder requirements into scalable web applications using Laravel, Vue, MySQL, CodeIgniter, and SQL Server.",
+        "Participated in agile delivery through sprint planning, backlog grooming, and stand-ups, while leading weekly feedback loops to gather user insights and drive continuous UX and feature improvements.",
+        "Optimized database queries and application performance, resulting in 40% faster page load times and improved system responsiveness.",
+        "Collaborated with UI/UX designers to implement responsive and accessible interfaces, ensuring optimal user experience across all devices.",
+        "Integrated third-party APIs and services to extend platform functionality, including payment gateways and document management systems.",
+        "Conducted code reviews and mentored junior developers, fostering knowledge sharing and maintaining code quality standards.",
+        "Developed and maintained RESTful APIs to support frontend functionality and mobile applications."
+      ],
+      skills: ["Laravel", "Vue.js", "MySQL", "SQL Server", "PHP", "CodeIgniter", "RESTful APIs", "Agile Development"],
     },
     {
-      title: "Software Development Intern",
-      company: "Amazon",
-      period: "Summer 2017",
-      description:
-        "Developed features for the Amazon Web Services console. Implemented responsive UI components and integrated with backend services.",
-      skills: ["JavaScript", "AWS", "React", "Java"],
+      title: "Project Manager & Backend Intern",
+      company: "PITOO.COOP",
+      period: "September 2021 – December 2021",
+      description: [
+        "Defined MVP scope and prioritized core features—including authentication, user profiles, and real-time multiplayer gameplay—in collaboration with the CTO and CEO.",
+        "Led a 3-person development team using Kanban methodology to deliver milestone-based builds and maintain stakeholder alignment throughout the development cycle.",
+        "Coordinated backend development and database schema design, ensuring scalable architecture and smooth real-time communication for all players.",
+        "Conducted regular playtests and feedback reviews to refine gameplay experience and inform feature adjustments before release.",
+        "Implemented real-time game state synchronization using WebSockets, reducing latency by 35% and improving overall game performance.",
+        "Created comprehensive API documentation and established development standards to ensure code consistency across the team.",
+        "Facilitated daily stand-ups and sprint retrospectives to continuously improve team efficiency and collaboration.",
+        "Developed automated testing suites to ensure game stability and reduce post-release bug reports by 45%."
+      ],
+      skills: ["Node.js", "Supabase", "Scrum", "Kanban", "WebSockets", "Project Management", "Team Leadership", "Agile Methodologies"],
+    },
+    {
+      title: "Assistant Professor",
+      company: "Universitas Pelita Harapan (UPH)",
+      period: "August 2020 - May 2021",
+      description: [
+        "Taught and mentored students in Calculus and Operating Systems using real-world applications and iterative assessment, fostering deep understanding, problem-solving skills, and applied technical thinking in a classroom of future engineers.",
+        "Developed and delivered comprehensive course materials, including lecture slides, assignments, and hands-on lab exercises that bridged theoretical concepts with practical applications.",
+        "Implemented active learning strategies and project-based assessments that increased student engagement and improved average exam scores by 22%.",
+        "Provided one-on-one academic advising and mentorship to students, helping them navigate challenging concepts and develop effective study strategies.",
+        "Collaborated with faculty members to continuously improve curriculum based on industry trends and student feedback.",
+        "Organized and led review sessions and workshops to support student learning outside of regular class hours.",
+        "Evaluated and graded students' coursework, providing constructive feedback to facilitate their academic growth.",
+        "Stayed current with the latest developments in computer science education and incorporated relevant advancements into course content."
+      ],
+      skills: ["Calculus", "Operating Systems", "Algorithms", "Teaching", "Curriculum Development", "Student Mentoring", "Academic Assessment"],
     },
   ]
 
@@ -65,7 +103,15 @@ export function ExperienceSection() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">{item.description}</p>
+                {Array.isArray(item.description) ? (
+                  <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                    {item.description.map((desc, i) => (
+                      <li key={i}>{desc}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground">{item.description}</p>
+                )}
                 <motion.div
                   className="mt-4 flex flex-wrap gap-2"
                   initial={{ opacity: 0 }}
