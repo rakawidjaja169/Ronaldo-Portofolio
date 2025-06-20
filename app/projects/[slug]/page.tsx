@@ -73,79 +73,89 @@ export default function ProjectPage({ params }: { params: { slug: string } }) {
           </AnimatedSection>
 
           <AnimatedSection delay={0.5}>
-            <h2 className="text-2xl font-bold">About this Project</h2>
-            <div className="prose max-w-none dark:prose-invert mt-4">
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                viewport={{ once: true }}
-              >
-                {project.content}
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                viewport={{ once: true }}
-              >
-                This project was developed to solve specific challenges in the domain. The implementation required
-                careful consideration of performance, scalability, and user experience.
-              </motion.p>
-              <motion.h3
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                viewport={{ once: true }}
-              >
-                Key Features
-              </motion.h3>
-              <motion.ul
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                viewport={{ once: true }}
-              >
-                {project.features.map((feature, index) => (
-                  <motion.li
-                    key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + index * 0.1 }}
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">About this Project</h2>
+                <div className="prose max-w-none dark:prose-invert">
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
                     viewport={{ once: true }}
+                    className="text-foreground"
                   >
-                    {feature}
-                  </motion.li>
-                ))}
-              </motion.ul>
-              <motion.h3
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                viewport={{ once: true }}
-              >
-                Challenges and Solutions
-              </motion.h3>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                viewport={{ once: true }}
-              >
-                One of the main challenges was optimizing performance for large datasets. This was solved by
-                implementing efficient data structures and algorithms, as well as leveraging caching strategies to
-                minimize database queries.
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-                viewport={{ once: true }}
-              >
-                Another challenge was creating an intuitive user interface that could handle complex workflows. Through
-                multiple iterations and user testing, we developed a clean and efficient UI that received positive
-                feedback.
-              </motion.p>
+                    {project.content}
+                  </motion.p>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <motion.h3
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  viewport={{ once: true }}
+                  className="text-2xl font-bold mb-4"
+                >
+                  Key Features
+                </motion.h3>
+                <motion.ul
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  viewport={{ once: true }}
+                  className="space-y-3 pl-5 list-disc"
+                >
+                  {project.features.map((feature, index) => (
+                    <motion.li
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      viewport={{ once: true }}
+                      className="text-foreground"
+                    >
+                      {feature}
+                    </motion.li>
+                  ))}
+                </motion.ul>
+              </div>
+
+              <div className="mt-8">
+                <motion.h3
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  viewport={{ once: true }}
+                  className="text-2xl font-bold mb-4"
+                >
+                  Challenges and Solutions
+                </motion.h3>
+                <div className="prose max-w-none dark:prose-invert space-y-4">
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    viewport={{ once: true }}
+                    className="text-foreground"
+                  >
+                    One of the main challenges was optimizing performance for large datasets. This was solved by
+                    implementing efficient data structures and algorithms, as well as leveraging caching strategies to
+                    minimize database queries.
+                  </motion.p>
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    viewport={{ once: true }}
+                    className="text-foreground"
+                  >
+                    Another challenge was creating an intuitive user interface that could handle complex workflows. Through
+                    multiple iterations and user testing, we developed a clean and efficient UI that received positive
+                    feedback.
+                  </motion.p>
+                </div>
+              </div>
             </div>
           </AnimatedSection>
         </div>
@@ -226,10 +236,14 @@ export default function ProjectPage({ params }: { params: { slug: string } }) {
                       <motion.div
                         key={category}
                         whileHover={{ scale: 1.1 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 10 }}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.7 + index * 0.1 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 10,
+                          delay: 0.7 + index * 0.1
+                        }}
                       >
                         <Badge className="bg-orange-500">{category}</Badge>
                       </motion.div>

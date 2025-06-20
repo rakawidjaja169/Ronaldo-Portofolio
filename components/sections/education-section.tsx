@@ -12,19 +12,11 @@ import { HoverCard } from "@/components/ui/hover-card"
 export function EducationSection() {
   const educationData = [
     {
-      degree: "Master of Computer Science",
-      institution: "Stanford University",
-      period: "2018 - 2020",
-      description:
-        'Specialized in Artificial Intelligence and Machine Learning. Thesis on "Neural Networks for Natural Language Processing".',
-      skills: ["Machine Learning", "AI", "NLP", "Data Science"],
-    },
-    {
-      degree: "Bachelor of Science in Computer Engineering",
-      institution: "MIT",
-      period: "2014 - 2018",
-      description: "Graduated with honors. Focus on software development and computer architecture.",
-      skills: ["Algorithms", "Data Structures", "Software Engineering", "Computer Architecture"],
+      degree: "Bachelor of Computer Science",
+      institution: "Universitas Pelita Harapan (UPH)",
+      period: "2018 - 2022",
+      description: "Graduated with GPA 3.57/4.0 (Cum Laude). Focus on software development and computer science fundamentals.",
+      skills: ["Algorithms", "Data Structures", "Software Engineering", "Web Development"],
     },
   ]
 

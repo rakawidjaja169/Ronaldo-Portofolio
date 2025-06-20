@@ -4,7 +4,7 @@ export async function GET() {
   // Create a vCard format string
   const vcard = `BEGIN:VCARD
 VERSION:3.0
-FN:John Doe
+FN:Ronaldo Katriel Widjaja
 N:Doe;John;;;
 TITLE:Software Engineer
 ORG:Self-employed
