@@ -17,6 +17,8 @@ jobs:
       - run: npm ci
       - name: Contrast gate (design-system.md §1.3)
         run: npm run check:contrast
+      - name: Placeholder gate (no unresolved content values)
+        run: npm run check:content
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build

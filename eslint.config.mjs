@@ -7,7 +7,8 @@ const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta
 const config = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: [".next/**", "node_modules/**", "out/**", "next-env.d.ts"],
+    // .tmp-* is scratch (see .gitignore). Gitignore does not imply eslintignore.
+    ignores: [".next/**", "node_modules/**", "out/**", "next-env.d.ts", ".tmp-*"],
   },
   {
     rules: {
@@ -16,8 +17,9 @@ const config = [
     },
   },
   {
-    // Build tooling: stdout IS the deliverable here, not a stray debug log.
-    files: ["scripts/**"],
+    // Build tooling and test runs: stdout IS the deliverable here — the pass/fail
+    // report is the whole point — not a stray debug log left behind.
+    files: ["scripts/**", "tests/**"],
     rules: { "no-console": "off" },
   },
 ]

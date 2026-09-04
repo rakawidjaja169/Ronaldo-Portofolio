@@ -50,19 +50,48 @@ theme choice survives reload with no flash.
 
 ---
 
-## M1 — Homepage
+## M1 — Homepage ✅
 
 The neutral fallback. Small surface, must feel finished.
 
-- Route group `app/(home)/` with its own layout and nav — structurally separate from
-  the persona layout so a shared link can never appear by accident.
-- Hero: name, one-line positioning, portrait or abstract mark.
-- Contact links: email, LinkedIn, GitHub. CV download.
+- Route group `app/(home)/` with its own layout — structurally separate from the persona
+  layout so a shared link can never appear by accident. No nav: the page is one screen with
+  nowhere to navigate to.
+- Hero: name, one-line positioning, portrait.
+- Contact links: email, LinkedIn, GitHub. No CV — it is per-persona and belongs to M6.
 - Footer with auto year.
-- `sitemap.xml` (homepage only) and `robots.txt` (persona paths disallowed).
+- `sitemap.xml` (homepage only) and `robots.txt` (silent on persona paths — see
+  `product.md` §2.4 for why `Disallow` would leak the enumeration it means to hide).
 - Root metadata, OG image, favicon set.
+- `scripts/check-content.mjs` placeholder gate, wired into CI as its own step.
+- `tests/homepage.mjs` — Playwright acceptance run: JS-disabled visibility, reduced motion,
+  theme persistence and no-flash, focus ring in both themes, responsive overflow.
+  `npm run test:e2e` against a running `npm start`. Deliberately **not** in CI yet: M7
+  replaces it with `@playwright/test` + axe + the isolation assertions, and wiring a
+  chromium download into every PR for a script that is about to be rewritten is waste.
 
 **Done when:** homepage deploys, contains zero links to any persona route, Lighthouse ≥ 95.
+
+### Measured (local, `npm run build && npm start`)
+
+| Gate | Result |
+| --- | --- |
+| First Load JS | 108 kB — budget 200 kB |
+| Lighthouse desktop | 100 / 100 / 100 / 100 |
+| Lighthouse mobile (median of 5) | Perf 94 · A11y 100 · BP 100 · SEO 100 |
+| CLS | 0.000 — budget 0.05 |
+| `public/portrait.webp` | 42 KB — budget 120 KB |
+| **LCP mobile** | **2.53s — budget 2.0s** ⚠ |
+
+**LCP is over budget and unresolved.** What was ruled out: the image (15ms fetch, AVIF,
+preloaded via srcset), the JS bundle (removing Framer entirely moved nothing), and an
+opacity animation on the LCP element itself (fixed — that one was real, and cost ~1.7s of
+render delay). What remains is main-thread render delay, measured under Lighthouse
+`simulate` throttling at 4× CPU on the same machine that is serving the site; identical
+builds scored 88–97, which is why the number above is a median. It needs a verdict against
+a real host, not a better local run — **M8 re-measures against the deployed Vercel build
+and that reading, not this one, decides whether the §8 budget is met.** If production also
+misses, it is fixed there, not deferred further.
 
 ---
 
@@ -168,7 +197,10 @@ The milestone that makes the promises in `design-system.md` §7–8 enforceable 
 - Vercel production, `portfolio.rakawidjaja.com` custom domain, DNS, HTTPS.
 - Verify security headers, `robots.txt`, and `sitemap.xml` on the live production origin —
   not just locally.
-- Post-deploy Lighthouse run against production.
+- Post-deploy Lighthouse run against production. **This is the authoritative reading of the
+  §8 budgets** — the local M1 numbers were taken under 4× CPU throttling on a machine also
+  serving the site. Settle the open M1 LCP finding here: if production LCP is under 2.0s,
+  record it and close the item; if it is not, fix it in this milestone.
 
 **Done when:** staging and production both serve the site, and a live `curl` confirms
 persona routes are `noindex` and absent from the sitemap.

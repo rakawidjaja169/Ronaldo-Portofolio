@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 
 import { ThemeScript } from "@/components/theme-script"
+import { site } from "@/content/site"
 import { env } from "@/lib/env"
 import { fontVariables } from "@/lib/fonts"
 
@@ -12,7 +13,21 @@ export const metadata: Metadata = {
     default: "Ronaldo Katriel",
     template: "%s — Ronaldo Katriel",
   },
-  description: "Portfolio of Ronaldo Katriel.",
+  description: site.positioning,
+  openGraph: {
+    type: "website",
+    siteName: site.name,
+    title: site.name,
+    description: site.positioning,
+    url: env.siteUrl,
+    locale: "en_US",
+    // images: resolved automatically from app/opengraph-image.tsx.
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: site.name,
+    description: site.positioning,
+  },
 }
 
 export const viewport: Viewport = {

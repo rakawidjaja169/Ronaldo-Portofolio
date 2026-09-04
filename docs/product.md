@@ -28,9 +28,12 @@ Enforced by:
    to top (`#top`), it does not `href="/"`. No breadcrumb, no "back home", no footer home link.
 2. **No links from the homepage to any persona page.** The homepage never enumerates personas.
 3. **No cross-persona links, ever.** No persona switcher, no "see my other work" module.
-4. **Search engines are excluded from persona paths.** `robots.txt` disallows every persona
-   route; each persona page emits `<meta name="robots" content="noindex, nofollow">`.
-   The homepage is indexable.
+4. **Search engines are excluded from persona paths — by `noindex` alone.** Each persona
+   page emits `<meta name="robots" content="noindex, nofollow">`. `robots.txt` says nothing
+   about persona paths, and must never be changed to. Two reasons: `robots.txt` is public at
+   a fixed URL, so listing the codes there publishes the very enumeration this rule exists to
+   prevent; and `Disallow` blocks the fetch, so the crawler never reads the `noindex` and a
+   URL found elsewhere can still be indexed as a bare link. The homepage is indexable.
 5. **No sitemap entry for persona routes.** `sitemap.xml` lists the homepage only.
 6. **Unknown persona codes 404.** `/xyz` returns Next's `notFound()` — it does not redirect
    to the homepage, because a redirect would confirm that valid codes exist and reward probing.
@@ -68,13 +71,13 @@ Deliberately minimal. It must look finished, not like a stub, while giving away 
 - Name, one-line positioning statement
 - Portrait or abstract 3D mark
 - Contact links: email, LinkedIn, GitHub
-- CV download
 - Footer: copyright, auto-year
 
 Layout is visually distinct from persona pages so the two never read as the same template.
 Its own route group, its own nav component, its own hero treatment.
 
-**Not on the homepage:** project lists, role framing, persona links, blog.
+**Not on the homepage:** project lists, role framing, persona links, blog. No CV either —
+the CV is tailored per persona, so it lives on the persona page and nowhere else.
 
 ## 5. Persona page (v1 scope — `/swe`)
 

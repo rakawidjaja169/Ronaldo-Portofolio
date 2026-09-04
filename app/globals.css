@@ -16,6 +16,8 @@
   --border-strong: #5a5a5a;
   --ink: #f5f5f5;
   --ink-muted: #a3a3a3;
+  /* 3.2:1 — disabled states and decorative glyphs only. Never body text:
+     axe flags it, and design-system.md §1.3 lists it as informational, not AA. */
   --ink-faint: #6e6e6e;
   --accent: #ff914d;
   /* Accent passes AA at every size on dark surfaces, so text reuses it. */
@@ -201,3 +203,56 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Above-the-fold entrance — CSS, not JS.
+
+   Framer's `initial` is serialized into the SSR markup as an inline style, so
+   a `motion` component above the fold ships as `opacity:0` and stays invisible
+   until hydration. That cost us twice: LCP render delay of ~2.1s on throttled
+   mobile (the paint waited on JS, not on the image, which arrived in 15ms),
+   and a completely blank page with JavaScript disabled — a §7 floor violation
+   and success criterion 6 in product.md.
+
+   These run off the first frame, need no JS, and are inert under
+   prefers-reduced-motion because a `reduce` query zeroes animation-duration.
+   `animation-fill-mode: backwards` holds the from-state during the delay
+   without ever writing opacity:0 into the server HTML.
+
+   Below the fold, scroll-triggered reveals still belong to Framer — an
+   IntersectionObserver is the right tool there and hydration has long since
+   finished. This is only for what paints first.
+   --------------------------------------------------------------------------- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mask-up {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@layer utilities {
+  .animate-rise-in {
+    animation: rise-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .animate-mask-up {
+    animation: mask-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+}
+
+/* Reduced motion: content is already at its final state because both keyframes
+   animate *to* the resting value and the global reduce block collapses the
+   duration. Nothing to disable, nothing to restore. */
