@@ -1,21 +1,35 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import ClientLayout from "./ClientLayout"
+import type { Metadata, Viewport } from "next"
 
-const inter = Inter({ subsets: ["latin"] })
+import { ThemeScript } from "@/components/theme-script"
+import { env } from "@/lib/env"
+import { fontVariables } from "@/lib/fonts"
+
+import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Ronaldo Katriel Widjaja - Software Engineer Portfolio",
-  description: "Portfolio website showcasing my projects, skills, and experience as a software engineer.",
-    generator: 'v0.dev'
+  metadataBase: new URL(env.siteUrl),
+  title: {
+    default: "Ronaldo Katriel",
+    template: "%s — Ronaldo Katriel",
+  },
+  description: "Portfolio of Ronaldo Katriel.",
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return <ClientLayout>{children}</ClientLayout>
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // No maximum-scale / user-scalable: pinch-zoom must never be disabled (§7).
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    // suppressHydrationWarning: ThemeScript mutates data-theme before React
+    // hydrates, so the server and client markup differ here by design.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
+      <body className={fontVariables}>{children}</body>
+    </html>
+  )
 }

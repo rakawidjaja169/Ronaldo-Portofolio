@@ -90,8 +90,10 @@ color without adding its assertion fails CI.
 | Body | **Space Grotesk** (`400`, `500`) | Distinct enough to feel designed, calm enough to read long-form. |
 | Meta / tags / code | **JetBrains Mono** (`400`, `500`) | Dates, tags, timeline years, tabular figures, code blocks. |
 
-Self-hosted via `next/font/local` (subset latin, `font-display: swap`, preloaded). No
-render-blocking Google Fonts request; no FOIT.
+Loaded via `next/font/google` (subset latin, `font-display: swap`). Next downloads the
+files at build time and serves them from our own origin, so this is self-hosted in effect —
+there is no runtime request to Google and no FOIT — without checking font binaries into the
+repo. Declared in `lib/fonts.ts`.
 
 ### 2.1 Scale
 

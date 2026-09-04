@@ -1,94 +1,203 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
+/* ---------------------------------------------------------------------------
+   Semantic color tokens — docs/design-system.md §1
+   Dark is the default theme. #333333 is the SURFACE color (cards, nav, modals),
+   not the page background; a deeper base beneath it creates elevation layers
+   and lets the accent carry real signal value.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --base: #1f1f1f;
+  --surface: #333333;
+  --surface-2: #3d3d3d;
+  --surface-3: #474747;
+  --border: #454545;
+  --border-strong: #5a5a5a;
+  --ink: #f5f5f5;
+  --ink-muted: #a3a3a3;
+  --ink-faint: #6e6e6e;
+  --accent: #ff914d;
+  /* Accent passes AA at every size on dark surfaces, so text reuses it. */
+  --accent-text: #ff914d;
+  --accent-hover: #ffa76d;
+  --accent-quiet: rgba(255, 145, 77, 0.12);
+  --scrim: rgba(15, 15, 15, 0.72);
+
+  /* Elevation — dark mode lightens the surface rather than casting a shadow,
+     because shadows are invisible against #1f1f1f. */
+  --elev-1: none;
+  --elev-2: none;
+  --elev-3: 0 24px 64px rgba(0, 0, 0, 0.6);
 }
 
-@layer utilities {
-  .text-balance {
+[data-theme="light"] {
+  --base: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f2f2f2;
+  --surface-3: #e8e8e8;
+  --border: #e0e0e0;
+  --border-strong: #c7c7c7;
+  --ink: #333333;
+  --ink-muted: #5f5f5f;
+  --ink-faint: #8a8a8a;
+  --accent: #ff914d;
+  /* #ff914d on #fafafa is 2.1:1 and FAILS AA for text. In light mode the raw
+     accent is permitted for fills, borders, and display type >= 24px bold only;
+     anything at body size must use --accent-text. */
+  --accent-text: #c2410c;
+  --accent-hover: #f97316;
+  --accent-quiet: rgba(255, 145, 77, 0.14);
+  --scrim: rgba(30, 30, 30, 0.55);
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --elev-2: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --elev-3: 0 24px 64px rgba(0, 0, 0, 0.18);
+}
+
+@theme inline {
+  --color-base: var(--base);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-quiet: var(--accent-quiet);
+  --color-scrim: var(--scrim);
+
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "Courier New", monospace;
+
+  /* Type scale — §2.1. Fluid across 375px -> 1440px. */
+  --text-display-xl: clamp(2.75rem, 9vw, 7.5rem);
+  --text-display-xl--line-height: 0.95;
+  --text-display-xl--letter-spacing: -0.03em;
+  --text-display-l: clamp(2.25rem, 6vw, 4.5rem);
+  --text-display-l--line-height: 1.02;
+  --text-display-l--letter-spacing: -0.025em;
+  --text-h1: clamp(2rem, 4vw, 3rem);
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h2: clamp(1.5rem, 2.6vw, 2rem);
+  --text-h2--line-height: 1.2;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.3;
+  --text-h3--letter-spacing: -0.01em;
+  --text-body-l: 1.125rem;
+  --text-body-l--line-height: 1.65;
+  --text-body: 1rem;
+  --text-body--line-height: 1.7;
+  --text-body-s: 0.875rem;
+  --text-body-s--line-height: 1.6;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.4;
+  --text-meta--letter-spacing: 0.08em;
+
+  /* Radius — §3 */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  /* Elevation — §3 */
+  --shadow-elev-1: var(--elev-1);
+  --shadow-elev-2: var(--elev-2);
+  --shadow-elev-3: var(--elev-3);
+
+  /* Section rhythm — §3 */
+  --spacing-section: clamp(96px, 12vh, 160px);
+  --spacing-inset: clamp(20px, 5vw, 64px);
+
+  /* Container — §3 */
+  --container-page: 1280px;
+
+  /* Breakpoints — §3 */
+  --breakpoint-xs: 375px;
+}
+
+/* Z-index scale — §3. Not in @theme: these are used as raw values, and
+   generating a z-* utility per layer invites ad-hoc numbers alongside them. */
+:root {
+  --z-base: 0;
+  --z-raised: 10;
+  --z-nav: 40;
+  --z-dropdown: 50;
+  --z-scrim: 90;
+  --z-modal: 100;
+  --z-toast: 1000;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--base);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    font-weight: 600;
     text-wrap: balance;
   }
-}
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+  /* Never removed. §7 */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+  ::selection {
+    background-color: var(--accent);
+    color: #1f1f1f;
+  }
+
+  /* Dates, years, and data columns must not shift width as digits change. */
+  time,
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
   }
-  body {
-    @apply bg-background text-foreground;
+}
+
+/* Reduced motion is a first-class path, not an afterthought — §4.4.
+   Content and layout stay identical; only movement is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
