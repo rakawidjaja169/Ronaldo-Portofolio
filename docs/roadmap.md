@@ -1,0 +1,200 @@
+# Roadmap — portfolio.rakawidjaja.com
+
+Nine milestones. Each is independently shippable and leaves the site in a deployable state.
+`swe` is the only persona built; the registry abstraction makes persona #2 a content-only
+change.
+
+Companion docs: [`product.md`](./product.md) (scope, isolation rule, content model),
+[`design-system.md`](./design-system.md) (tokens, motion, budgets).
+
+---
+
+## Stack
+
+| Concern | Choice |
+| --- | --- |
+| Framework | Next.js 15, App Router, React 19 |
+| Language | TypeScript, `strict: true` |
+| Styling | Tailwind CSS v4, semantic tokens in `@theme` |
+| Motion | Framer Motion + `three.js` (hero only, lazy) |
+| Content | Typed TS registry + MDX via `next-mdx-remote` or `@next/mdx` |
+| Validation | `zod` on MDX frontmatter, at build time |
+| Icons | `lucide-react` |
+| Testing | Playwright (e2e, a11y via `axe-core`, visual) |
+| CI | GitHub Actions + Lighthouse CI |
+| Hosting | Dokploy (staging, Docker) · Vercel free tier (production) |
+
+Everything is statically generated. No database, no serverless functions, no runtime secrets.
+
+---
+
+## M0 — Foundation
+
+Clean scaffold and the guardrails everything else depends on.
+
+- Next 15 + TS strict + Tailwind v4 scaffold. Working tree is empty; the previous Next 14
+  scaffold stays in git history for reference only.
+- Design tokens in `app/globals.css` under `@theme`, both themes, exactly as specified in
+  `design-system.md` §1.
+- `lib/motion.ts` with the shared presets.
+- Self-hosted fonts via `next/font/local` (Archivo, Space Grotesk, JetBrains Mono).
+- Theme provider + pre-paint inline script that reads `localStorage.theme` and sets
+  `data-theme` on `<html>` before first paint. No flash.
+- ESLint + Prettier + `tsc --noEmit`.
+- GitHub Actions: lint, typecheck, build on every PR.
+- `lib/env.ts` and `.env.example` — both empty of required vars for now, present so the
+  pattern exists before the first variable is added.
+
+**Done when:** `npm run build` succeeds, both themes render correct tokens, CI is green,
+theme choice survives reload with no flash.
+
+---
+
+## M1 — Homepage
+
+The neutral fallback. Small surface, must feel finished.
+
+- Route group `app/(home)/` with its own layout and nav — structurally separate from
+  the persona layout so a shared link can never appear by accident.
+- Hero: name, one-line positioning, portrait or abstract mark.
+- Contact links: email, LinkedIn, GitHub. CV download.
+- Footer with auto year.
+- `sitemap.xml` (homepage only) and `robots.txt` (persona paths disallowed).
+- Root metadata, OG image, favicon set.
+
+**Done when:** homepage deploys, contains zero links to any persona route, Lighthouse ≥ 95.
+
+---
+
+## M2 — Persona shell and hero
+
+The routing abstraction plus the site's most expensive component.
+
+- `content/personas.ts` registry, `Persona` type, `content/personas/swe.ts`.
+- `app/[persona]/layout.tsx` + `page.tsx`, `generateStaticParams` from the registry.
+- Unknown code → `notFound()`. Explicitly **not** a redirect to `/`.
+- Per-persona metadata with `robots: { index: false, follow: false }`.
+- Persona nav: sticky, scroll-condensing, anchor scroll-spy, mobile sheet. Logo scrolls to
+  top; it is not a link to `/`.
+- Hero section: mask-reveal headline, CTA.
+- WebGL backdrop: dynamic import, `ssr: false`, mounted post-paint, IntersectionObserver +
+  `visibilitychange` pause, dpr clamp, all four skip conditions from `design-system.md` §5,
+  static gradient poster fallback.
+
+**Done when:** `/swe` renders statically, `/xyz` 404s, hero holds LCP < 2.0s on throttled
+mobile, `prefers-reduced-motion` renders the poster and never mounts the canvas.
+
+---
+
+## M3 — Work grid and lightbox
+
+- `ProjectCard` per `design-system.md` §6 — card link and lightbox trigger are separate
+  controls so the link is never hijacked.
+- Filterable grid, tag chips with `aria-pressed`, staggered entrance.
+- Lightbox: focus trap, Esc, arrow-key navigation, scrim click, body scroll lock,
+  shared-element open from the clicked thumbnail, adjacent-image preload.
+- Designed empty state for a filter that matches nothing.
+
+**Done when:** grid and lightbox are fully keyboard operable, CLS stays under 0.05 while
+filtering, axe reports zero violations on the section.
+
+---
+
+## M4 — Case studies
+
+- MDX pipeline: `content/projects/swe/*.mdx`, zod-validated frontmatter, build fails on a
+  malformed file.
+- `app/[persona]/work/[slug]/page.tsx` with `generateStaticParams`.
+- MDX component mapping to design-system typography, plus gallery and callout components.
+- Gallery images reuse the M3 lightbox.
+- Per-case-study OG metadata, still `noindex`.
+
+**Done when:** every project links to a rendering case study, a bad frontmatter field fails
+the build with a readable error.
+
+---
+
+## M5 — Blog
+
+- `content/blog/swe/*.mdx`, same validated pipeline.
+- `/[persona]/blog` list: title, date, reading time, tags, newest first, paginated at 10.
+- `/[persona]/blog/[slug]`: title, date, author, reading time, MDX body.
+- Outline sidebar built from `h2`/`h3` at build time, scroll-spy with `aria-current`,
+  click-to-jump, disclosure collapse on mobile.
+- Prev/next links scoped to the same persona.
+- Designed empty state when a persona has no posts.
+
+**Done when:** outline tracks scroll accurately, headings are deep-linkable, list paginates
+correctly.
+
+---
+
+## M6 — Experience, skills, contact, footer
+
+- Timeline as `<ol>`, scroll-drawn rail, mono tabular years, entries animating in from the rail.
+- Skills grouped by category.
+- Contact block: email, LinkedIn, GitHub, WhatsApp, CV download. No form.
+- Persona footer: social links and auto year, no homepage link.
+
+**Done when:** `/swe` is content-complete end to end.
+
+---
+
+## M7 — Quality gate
+
+The milestone that makes the promises in `design-system.md` §7–8 enforceable rather than aspirational.
+
+- Playwright e2e: homepage and `/swe` smoke, lightbox keyboard flow, theme persistence,
+  blog outline scroll-spy, 404 on unknown persona.
+- **Isolation test** — asserts no anchor on any persona route resolves to `/` or to another
+  persona code, and that the homepage links to no persona route. This is the product's
+  defining constraint; it gets a test, not a convention.
+- `axe-core` pass on every route in both themes. Zero critical or serious violations.
+- Visual regression snapshots at 375 / 768 / 1440.
+- Token contrast assertion test covering the `design-system.md` §1.3 table.
+- Lighthouse CI wired into the PR gate with the §8 budgets. Regression fails the build.
+- Reduced-motion run: verify WebGL never mounts and all content stays reachable.
+- JS-disabled run: verify all text content renders.
+
+**Done when:** the full suite is green in CI and the budget gate blocks a deliberate regression.
+
+---
+
+## M8 — Deploy
+
+- `Dockerfile`: multi-stage, `output: "standalone"`, non-root user, healthcheck.
+- `.dockerignore`.
+- Dokploy staging deploy documented in `docs/deploy.md`.
+- Vercel production, `portfolio.rakawidjaja.com` custom domain, DNS, HTTPS.
+- Verify security headers, `robots.txt`, and `sitemap.xml` on the live production origin —
+  not just locally.
+- Post-deploy Lighthouse run against production.
+
+**Done when:** staging and production both serve the site, and a live `curl` confirms
+persona routes are `noindex` and absent from the sitemap.
+
+---
+
+## Backlog — explicitly not scheduled
+
+Pulled forward only on evidence of need.
+
+- Additional personas (`cst`, `cc`, `pm`, `dsn`) — content-only work once M2 lands
+- WYSIWYG studio that emits MDX
+- Contact form (needs a backend and rate limiting)
+- Analytics
+- RSS feed — note this would leak persona blog URLs, so it needs an isolation review first
+- i18n
+- Full-text blog search
+
+---
+
+## Sequencing notes
+
+- M0 → M2 are strictly sequential; M3–M6 could be parallelized across agents, but each owns
+  distinct files.
+- M7 can begin as soon as M3 lands; individual tests are added per milestone rather than all
+  at the end. The isolation test specifically should be written during M2, when the routing
+  abstraction is fresh, and extended thereafter.
+- If a milestone breaks the M7 budget, fix it inside that milestone. Never defer a
+  performance regression to a later cleanup pass.
