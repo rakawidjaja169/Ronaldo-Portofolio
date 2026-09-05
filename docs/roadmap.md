@@ -236,23 +236,95 @@ thing to remove, not another local run.
 
 ---
 
-## M4 — Case studies
+## M4 — Case studies ✅
 
 > **Sequencing note.** M6 shipped before M4 and M5. M6's content already existed in
-> `content/_raw-experience.md`; M4's does not, and five of its six projects are still blocked
+> `content/_raw-experience.md`; M4's does not, and five of its six projects were still blocked
 > on the publication question M3 carried out. See the note at the top of M6. M4 and M5 now run
 > adjacent, which suits them — they share the MDX + zod pipeline.
 
 - MDX pipeline: `content/projects/swe/*.mdx`, zod-validated frontmatter, build fails on a
   malformed file.
-- `app/[persona]/work/[slug]/page.tsx` with `generateStaticParams`.
-- MDX component mapping to design-system typography, plus gallery and callout components.
-- Gallery images reuse the M3 lightbox.
-- Per-case-study OG metadata, still `noindex`.
+- `app/[persona]/work/[slug]/page.tsx` with `generateStaticParams`, `dynamicParams = false`.
+- `mdx-components.tsx` maps every element onto the existing type tokens — no
+  `@tailwindcss/typography`, which would have introduced a second scale to fight the nine
+  tokens already defined.
+- `components/persona/callout.tsx` (the `blockquote` mapping) and
+  `components/persona/case-study-gallery.tsx`, which reuses the M3 lightbox unchanged.
+- Per-case-study metadata, still `noindex`.
+- **Abstract app visuals.** `scripts/generate-app-visuals.mjs` renders one deterministic
+  schematic per blocked project in the site's own tokens, replacing the shared
+  `_placeholder.webp`. The alt text says they are schematics: a drawing that passes for a
+  screenshot is a worse failure than a blank box.
+- `PersonaNav` gained a `basePath` prop, because the same nav now wraps the case studies.
 
 **Done when:** every project links to a rendering case study, a bad frontmatter field fails
-the build with a readable error.
+the build with a readable error. ✅ — both verified, the second by fault injection (below).
 
+### Three traps this milestone turned up, recorded so they are not re-introduced
+
+1. **A nested `generateStaticParams` is only handed its parent's params when an ANCESTOR
+   generates them — meaning the parent *layout*.** `app/[persona]/layout.tsx` exports none,
+   and the one in `app/[persona]/page.tsx` is a *sibling*, so the nested function received
+   `{}` and silently dropped every slug. **The build passed green with zero case-study routes
+   emitted** — the route was listed, only the indented paths under it were missing. The fix
+   is the `{ persona, slug }` cross product returned from the nested function; adding a
+   `generateStaticParams` to the layout instead would put a third copy of the persona list in
+   the tree.
+2. **Nested-route metadata does not inherit either.** `generateMetadata` inherits from the
+   parent *layout*, which exports no metadata at all — the `robots` and `canonical` values
+   live in `app/[persona]/page.tsx`, a sibling. They are restated in full in the case study
+   for that reason. Deleting them would make the sub-route indexable while `/swe` stayed
+   clean, which is precisely the failure §2.4 is written against. `[case study · indexing]`
+   is the gate; a passing `[indexing]` on `/swe` proves nothing about it.
+3. **Frontmatter is an ESM export, validated by zod — not YAML, and there is no
+   `gray-matter`.** MDX supports `export const meta` natively, so the object lives in the same
+   file as the prose with no second source of truth. zod is there because `@types/mdx`
+   declares `*.mdx` with a single `default` export, so TypeScript cannot see `meta` at all;
+   the schema validates the *whole module*, which is what removes the need for a cast that
+   would have asserted exactly the unverified thing. Do not "restore" a YAML parser.
+
+### Measured (local, `npm run build && npm start`)
+
+| Gate | Result |
+| --- | --- |
+| First Load JS, `/[persona]/work/[slug]` | 155 kB — budget 200 kB (`/[persona]` is 169 kB) |
+| Static routes emitted | 15, including all six case studies |
+| `tests/persona.mjs` | all assertions pass, 3 consecutive runs |
+| `tests/homepage.mjs` | all pass |
+| Malformed frontmatter | build **fails** with the file path and the failing key |
+| Lighthouse mobile, case study | Perf 93 · A11y 100 · BP 100 · SEO 66 |
+| Lighthouse mobile, `/swe` control, same session | Perf 79 |
+| Horizontal overflow, 375 / 768 / 1440 | none; `pre` scrolls inside itself |
+| Prose measure | 37ch at 375px, 70ch at 768px and above |
+
+**SEO 66 is the correct result, not a defect.** The only failing audit is `is-crawlable`,
+which is `noindex` doing its job — §2.4 is the entire search-engine exclusion. Any change
+that raises this number has broken the product's defining constraint.
+
+**The perf numbers are paired and still not conclusive**, for the reason M3 recorded: this
+machine swings ~8 points per run while also serving the site under 4× CPU throttling. The
+case study reading *above* the persona page is expected — it ships less client JS — but the
+control is what makes that readable at all. M8 settles the absolute numbers off this machine.
+
+**The zod claim was proved, not asserted.** `period:` was corrupted to `perid:` in
+`ticketing-system.mdx`; the build failed with
+`Invalid case study in content/projects/swe/ticketing-system.mdx:` and named the missing key.
+The file was restored and the build re-verified green.
+
+### Carried out of M4
+
+- **Six case studies' worth of prose is still placeholder.** `check:content` now scans
+  `.mdx` as well as `.ts` — a two-line change without which every one of these would have
+  deployed under a green check. It names them alongside the `content/site.ts`,
+  `content/work.ts` and `content/personas/swe.ts` items, and blocks deploy.
+- **The publication question M3 carried out is now answered for the visuals but not the
+  screenshots.** The `SETS` gate in `scripts/prepare-work-images.mjs` still stands; granting
+  permission later is one entry plus a re-run, and the generated schematic is what ships
+  until then.
+- **`text-ink-faint` is not a text colour.** It failed Lighthouse at 3.23:1 on the meta
+  labels and was swapped for `text-ink-muted`. `scripts/check-contrast.mjs` registers it
+  `info: true` — measured but unrated — which is easy to read as "passing".
 ---
 
 ## M5 — Blog

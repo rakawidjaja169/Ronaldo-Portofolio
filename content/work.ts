@@ -11,11 +11,16 @@
  *
  * SCREENSHOT PUBLICATION. Only `online-admission-sdh` shows real screenshots:
  * it is public software at a public URL. The other five are an employer's
- * internal admin tools and that permission is still open, so they point at
- * `_placeholder.webp`. The raw sets survive in git at c35dee3 and
- * scripts/prepare-work-images.mjs regenerates any of them by adding one entry
- * to its SETS list. Publishing an internal admin screen is the one thing here
- * that an edit cannot take back once it is cached and scraped.
+ * internal admin tools, so they carry a generated abstraction instead — see
+ * scripts/generate-app-visuals.mjs. Each is a schematic of how that system is
+ * organised, drawn in the site's own tokens, and its alt text says so outright:
+ * a drawing a reader mistakes for a screenshot would be a worse failure than
+ * the flat placeholder it replaced. Publishing an internal admin screen is the
+ * one thing here that an edit cannot take back once it is cached and scraped.
+ *
+ * The raw screenshot sets survive in git at c35dee3, and the publication gate
+ * in scripts/prepare-work-images.mjs still stands: if permission ever arrives,
+ * adding one entry to its SETS list regenerates that project's real shots.
  */
 
 import type { PersonaCode } from "@/content/personas"
@@ -42,20 +47,32 @@ export type WorkItem = {
   /** Live URL. Omitted when the system is internal. */
   href?: string
   /**
-   * M4 owns /[persona]/work/[slug]. Until that route exists, a card that linked
-   * to it would link to a 404, which is worse than a card that does not link
-   * yet — so the card link renders only when this is true.
+   * The card links to /[persona]/work/[slug] only when this is true. It stayed
+   * false through M3 because the route did not exist and a card linking to a
+   * 404 is worse than a card that does not link; M4 built the route and every
+   * item now has a study, so the flag has no false case today. It stays because
+   * a persona added later will have items before it has case studies.
    */
   hasCaseStudy: boolean
   images: readonly WorkImage[]
 }
 
-const PLACEHOLDER: WorkImage = {
-  src: "/work/_placeholder.webp",
-  thumb: "/work/_placeholder.webp",
-  alt: "Screenshots not published — this is an internal system",
-  width: 800,
-  height: 500,
+/**
+ * The generated stand-in for a project whose screenshots are not published.
+ * Produced by scripts/generate-app-visuals.mjs, one distinct composition per
+ * slug. `description` completes the sentence "Abstract schematic of ..." so
+ * every alt string states what the image is and why it is not a screenshot.
+ */
+function visual(slug: string, description: string): readonly WorkImage[] {
+  return [
+    {
+      src: `/work/${slug}.webp`,
+      thumb: `/work/${slug}-thumb.webp`,
+      alt: `Abstract schematic of ${description} — not a screenshot; this is an internal system and its screens are not published`,
+      width: 1600,
+      height: 1000,
+    },
+  ]
 }
 
 /** Five shots of the SDH admission portal, from scripts/prepare-work-images.mjs. */
@@ -106,7 +123,7 @@ const swe: readonly WorkItem[] = [
     tags: ["Web", "Enterprise", "Payments"],
     year: "2022",
     href: "https://sdh.or.id/registrasi/",
-    hasCaseStudy: false,
+    hasCaseStudy: true,
     images: admissionShots,
   },
   {
@@ -115,8 +132,8 @@ const swe: readonly WorkItem[] = [
     outcome: "TODO — one line: what the helpdesk system does and who it serves.",
     tags: ["Web", "Internal Tools"],
     year: "2023",
-    hasCaseStudy: false,
-    images: [PLACEHOLDER],
+    hasCaseStudy: true,
+    images: visual("ticketing-system", "the ticket queue, showing work moving through its status lanes"),
   },
   {
     slug: "asset-inventory",
@@ -124,8 +141,8 @@ const swe: readonly WorkItem[] = [
     outcome: "TODO — one line: what the inventory system tracks and for whom.",
     tags: ["Web", "Internal Tools"],
     year: "2023",
-    hasCaseStudy: false,
-    images: [PLACEHOLDER],
+    hasCaseStudy: true,
+    images: visual("asset-inventory", "the asset register, a tile per item with a few flagged for attention"),
   },
   {
     slug: "facility-management",
@@ -133,8 +150,8 @@ const swe: readonly WorkItem[] = [
     outcome: "TODO — one line: what facility work this system coordinates.",
     tags: ["Web", "Internal Tools"],
     year: "2023",
-    hasCaseStudy: false,
-    images: [PLACEHOLDER],
+    hasCaseStudy: true,
+    images: visual("facility-management", "a site floorplan with one maintenance request routed between buildings"),
   },
   {
     slug: "moodle-lms",
@@ -142,8 +159,8 @@ const swe: readonly WorkItem[] = [
     outcome: "TODO — one line: what was built on top of Moodle and why.",
     tags: ["Web", "Education", "Integration"],
     year: "2022",
-    hasCaseStudy: false,
-    images: [PLACEHOLDER],
+    hasCaseStudy: true,
+    images: visual("moodle-lms", "stacked course modules, each with its own completion rule"),
   },
   {
     slug: "evaluation-system",
@@ -151,8 +168,8 @@ const swe: readonly WorkItem[] = [
     outcome: "TODO — one line: what the evaluation system measures and reports.",
     tags: ["Web", "Internal Tools", "Reporting"],
     year: "2024",
-    hasCaseStudy: false,
-    images: [PLACEHOLDER],
+    hasCaseStudy: true,
+    images: visual("evaluation-system", "a criteria matrix, each cell weighted by score"),
   },
 ]
 

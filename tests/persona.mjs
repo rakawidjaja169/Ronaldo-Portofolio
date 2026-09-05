@@ -197,7 +197,13 @@ console.log("\n[no javascript]")
     ok((await page.locator("#" + id).count()) === 1, "section #" + id + " exists")
   }
 
-  const navLinks = await page.locator('header nav a[href^="#"]').count()
+  /*
+    `/swe#work`, not `#work`. The nav takes a basePath as of M4 because it also
+    wraps the case studies, where a bare fragment resolves inside the case study
+    and goes nowhere; on /swe itself the persona-absolute form is still a
+    same-document fragment, so the browser scrolls in place either way.
+  */
+  const navLinks = await page.locator('header nav a[href*="#"]').count()
   ok(navLinks > 0, "nav anchors render without JS (" + navLinks + ")")
 
   /*
@@ -411,7 +417,12 @@ console.log("\n[work grid]")
   }
 
   await page.keyboard.press("Escape")
-  await page.waitForTimeout(400)
+  /*
+    Wait for the node to detach, not for a fixed delay. The exit is a ~200ms
+    fade, so a hardcoded timeout asserts a boundary rather than the behaviour —
+    and lands on the wrong side of it whenever the tween shifts.
+  */
+  await dialog.waitFor({ state: "detached", timeout: 2000 }).catch(() => {})
   ok((await dialog.count()) === 0, "Escape closes the lightbox")
   ok(
     (await page.evaluate(
@@ -547,7 +558,14 @@ console.log("\n[work grid · reduced motion]")
     "focus is trapped under reduced motion",
   )
   await page.keyboard.press("Escape")
-  await page.waitForTimeout(300)
+  /*
+    Detach, not a delay — see the note in [case study · gallery]. The panel exit
+    collapses to 0.01s under reduced motion but the BACKDROP fade does not, and
+    deliberately so: an opacity cross-fade carries no motion to be sick from,
+    which is why lightbox.tsx gates the transform and leaves the fade alone.
+    That difference is exactly what a fixed timeout turns into a flake.
+  */
+  await dialog.waitFor({ state: "detached", timeout: 2000 }).catch(() => {})
   ok((await dialog.count()) === 0, "Escape still closes under reduced motion")
 
   await browser.close()
@@ -780,6 +798,325 @@ console.log("\n[experience · skills · contact · reduced motion]")
   )
 
   await browser.close()
+}
+
+
+/* ------------------------------------------------------------------ M4 */
+
+/*
+  17. Case-study routing — product.md §2.6, §5.2.
+
+  The slug list is read from the persona page's own hrefs rather than imported
+  from content/case-studies.ts. A test that reads the same source as the code
+  under test cannot catch that source being wrong — the same rule the RESERVED
+  list above already follows.
+*/
+const SLUGS = [
+  ...new Set(
+    [...html.matchAll(new RegExp('href="/' + BUILT + '/work/([^"/]+)"', "g"))].map((m) => m[1]),
+  ),
+]
+
+console.log("\n[case study · routing]")
+{
+  ok(SLUGS.length > 0, "persona page links to " + SLUGS.length + " case studies")
+
+  for (const slug of SLUGS) {
+    const res = await fetch(ORIGIN + "/" + BUILT + "/work/" + slug, { redirect: "manual" })
+    ok(res.status === 200, "/" + BUILT + "/work/" + slug + " returns 200, got " + res.status)
+  }
+
+  /* Same §2.6 rule as /xyz: a 404, never a redirect that confirms the shape. */
+  const unknown = await fetch(ORIGIN + "/" + BUILT + "/work/nope", { redirect: "manual" })
+  ok(unknown.status === 404, "unknown slug returns 404, got " + unknown.status)
+  ok(unknown.headers.get("location") === null, "unknown slug sends no Location header")
+
+  /*
+    A real slug under a RESERVED persona. This is the combination that would
+    leak: the code is unbuilt but the slug exists, so a route that guarded only
+    the slug would answer 200 and confirm the persona.
+  */
+  const first = SLUGS[0]
+  for (const code of RESERVED) {
+    const res = await fetch(ORIGIN + "/" + code + "/work/" + first, { redirect: "manual" })
+    ok(res.status === 404, "/" + code + "/work/" + first + " returns 404, got " + res.status)
+  }
+}
+
+const studyUrl = ORIGIN + "/" + BUILT + "/work/" + SLUGS[0]
+const studyHtml = await (await fetch(studyUrl)).text()
+
+/*
+  18. Case-study indexing — §2.4, and the trap this route was written around:
+  generateMetadata inherits from the parent LAYOUT, and app/[persona]/layout.tsx
+  exports no metadata. A passing [indexing] group on /swe proves nothing here —
+  the values are restated in the sub-route or they do not exist.
+*/
+console.log("\n[case study · indexing]")
+{
+  const meta = studyHtml.match(/<meta name="robots" content="([^"]*)"/i)
+  ok(meta !== null, "case study emits a robots meta tag")
+  ok(/noindex/i.test(meta?.[1] ?? ""), "case study robots contains noindex — got: " + meta?.[1])
+  ok(/nofollow/i.test(meta?.[1] ?? ""), "case study robots contains nofollow")
+  ok(
+    !/<link rel="canonical"/i.test(studyHtml),
+    "case study emits no canonical link (§2.4 — not shareable into an index)",
+  )
+
+  const sitemap = await (await fetch(ORIGIN + "/sitemap.xml")).text()
+  ok(!/\/work\//.test(sitemap), "sitemap.xml lists no case-study path")
+}
+
+/* 19. Case-study isolation — §2.1-2.3. The back link is the new risk surface. */
+console.log("\n[case study · isolation]")
+{
+  const hrefs = [...studyHtml.matchAll(/href="([^"]*)"/g)].map((m) => m[1])
+  ok(hrefs.length > 0, "found " + hrefs.length + " hrefs on the case study")
+
+  const offending = []
+  for (const href of hrefs) {
+    if (/^(mailto:|tel:|#)/.test(href)) continue
+    let resolved
+    try {
+      resolved = new URL(href, studyUrl)
+    } catch {
+      continue
+    }
+    if (resolved.origin !== ORIGIN) continue
+
+    const path = resolved.pathname.replace(/\/$/, "")
+    if (path === "") offending.push(href + " -> homepage")
+    const seg = path.split("/")[1]
+    if (seg && seg !== BUILT && RESERVED.includes(seg)) offending.push(href + " -> persona " + seg)
+  }
+  ok(
+    offending.length === 0,
+    "no case-study anchor resolves to / or another persona" +
+      (offending.length ? ": " + offending.join(", ") : ""),
+  )
+
+  /*
+    Nav anchors must be persona-absolute here. A bare "#work" resolves inside
+    the case study and silently goes nowhere — a dead nav that every other
+    assertion in this file would happily pass.
+  */
+  const navHrefs = [...studyHtml.matchAll(/<header[\s\S]*?<\/header>/g)]
+    .flatMap((m) => [...m[0].matchAll(/href="([^"]*)"/g)].map((h) => h[1]))
+    .filter((h) => h.includes("#"))
+  ok(navHrefs.length > 0, "nav renders " + navHrefs.length + " section anchors")
+  const bare = navHrefs.filter((h) => h.startsWith("#"))
+  ok(
+    bare.length === 0,
+    "no nav anchor is a bare fragment" + (bare.length ? ": " + bare.join(", ") : ""),
+  )
+
+  /* And the way out is persona-relative, which is the only way out there is. */
+  ok(hrefs.includes("/" + BUILT + "#work"), 'case study links back to "/' + BUILT + '#work"')
+}
+
+/* 20. Case-study gallery — §5.2 "the same lightbox component", §7. */
+console.log("\n[case study · gallery]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  await page.goto(studyUrl, { waitUntil: "networkidle" })
+
+  ok((await page.locator("h1").count()) === 1, "exactly one h1 on the case study")
+
+  /* §7 heading order — the MDX body must not open above the page title. */
+  const levels = await page.evaluate(() =>
+    [...document.querySelectorAll("main h1, main h2, main h3, main h4")].map((h) =>
+      Number(h.tagName[1]),
+    ),
+  )
+  ok(levels[0] === 1, "case study opens at <h1>, got h" + levels[0])
+  ok(
+    levels.every((lvl, i) => i === 0 || lvl - levels[i - 1] <= 1),
+    "no heading level is skipped: " + levels.join(","),
+  )
+
+  const shots = await page.locator('button[aria-label^="Enlarge image "]').count()
+  ok(shots > 0, "gallery renders " + shots + " triggers")
+
+  /* Tab to it, not .focus() — same reason as the work grid. */
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await page.locator("body").click({ position: { x: 2, y: 2 } })
+  let reached = false
+  for (let i = 0; i < 100 && !reached; i++) {
+    await page.keyboard.press("Tab")
+    reached = await page.evaluate(() =>
+      (document.activeElement?.getAttribute("aria-label") ?? "").startsWith("Enlarge image "),
+    )
+  }
+  ok(reached, "a gallery trigger is reachable by Tab")
+
+  const triggerLabel = await page.evaluate(
+    () => document.activeElement?.getAttribute("aria-label") ?? "",
+  )
+
+  await page.keyboard.press("Enter")
+  const dialog = page.locator('[role="dialog"][aria-modal="true"]')
+  ok(await dialog.isVisible(), "Enter opens the lightbox")
+  ok(
+    await page.evaluate(() => document.activeElement?.closest('[role="dialog"]') !== null),
+    "focus lands inside the dialog",
+  )
+
+  const counter = page.locator('[role="dialog"] [aria-live="polite"]')
+  if (shots > 1 && (await counter.count()) > 0) {
+    const before = (await counter.first().textContent())?.trim()
+    await page.keyboard.press("ArrowRight")
+    await page.waitForTimeout(150)
+    ok(
+      (await counter.first().textContent())?.trim() !== before,
+      "ArrowRight advances from " + before,
+    )
+  } else {
+    /*
+      Not a skip. Which slug sorts first in the grid is content, and a
+      single-image set has nothing to advance to — the arrows are already
+      asserted against a multi-image set in [work grid].
+    */
+    ok(shots === 1, "single-image gallery has no counter to advance (" + shots + " image)")
+  }
+
+  await page.keyboard.press("Escape")
+  /*
+    Wait for the node to detach, not for a fixed delay. The exit is a ~200ms
+    fade, so a hardcoded timeout asserts a boundary rather than the behaviour —
+    and lands on the wrong side of it whenever the tween shifts.
+  */
+  await dialog.waitFor({ state: "detached", timeout: 2000 }).catch(() => {})
+  ok((await dialog.count()) === 0, "Escape closes the lightbox")
+  /*
+    THE ASSERTION Lightbox DELEGATES. Its docblock states it does not restore
+    focus "because only the opener knows which button to go back to", so this
+    is the only place the gallery's own onClose is checked.
+  */
+  ok(
+    (await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")) ===
+      triggerLabel,
+    "focus returns to the trigger that opened it",
+  )
+  ok(
+    (await page.evaluate(() => getComputedStyle(document.body).overflow)) !== "hidden",
+    "body scroll lock is released",
+  )
+
+  await browser.close()
+}
+
+/* 21. Case study without JS — the prose IS the page. */
+console.log("\n[case study · no javascript]")
+{
+  const browser = await chromium.launch()
+  const ctx = await browser.newContext({ javaScriptEnabled: false })
+  const page = await ctx.newPage()
+  await page.goto(studyUrl, { waitUntil: "load" })
+
+  const paras = await page.locator("main p").count()
+  ok(paras > 0, "MDX prose renders without JS (" + paras + " paragraphs)")
+  ok((await page.locator("main h2").count()) > 0, "body headings render without JS")
+
+  /* Parent opacity, per the M2 wrapper trap. */
+  const hidden = await page.evaluate(() =>
+    [...document.querySelectorAll("main p, main h1, main h2")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.textContent.trim().slice(0, 40)),
+  )
+  ok(
+    hidden.length === 0,
+    "case-study prose is opaque without JS" + (hidden.length ? ": " + hidden.join(" | ") : ""),
+  )
+
+  /* The gallery degrades to plain images — the thumbnails are server-rendered. */
+  ok(
+    (await page.locator('button[aria-label^="Enlarge image "]').count()) > 0,
+    "gallery thumbnails render without JS",
+  )
+  ok(
+    (await page.locator('[role="dialog"]').count()) === 0,
+    "no lightbox markup ships with the document",
+  )
+
+  await browser.close()
+}
+
+/* 22. Case study under reduced motion — §4.4. */
+console.log("\n[case study · reduced motion]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({
+    reducedMotion: "reduce",
+    viewport: { width: 1280, height: 900 },
+  })
+  await page.goto(studyUrl, { waitUntil: "networkidle" })
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await page.waitForTimeout(600)
+
+  const faded = await page.evaluate(() =>
+    [...document.querySelectorAll("main p, main h1, main h2")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.textContent.trim().slice(0, 40)),
+  )
+  ok(
+    faded.length === 0,
+    "case-study content is opaque under reduced motion" +
+      (faded.length ? ": " + faded.join(" | ") : ""),
+  )
+
+  await page.locator('button[aria-label^="Enlarge image "]').first().click()
+  const dialog = page.locator('[role="dialog"][aria-modal="true"]')
+  ok(await dialog.isVisible(), "lightbox opens under reduced motion")
+  await page.keyboard.press("Escape")
+  /*
+    Detach, not a delay — see the note in [case study · gallery]. The panel exit
+    collapses to 0.01s under reduced motion but the BACKDROP fade does not, and
+    deliberately so: an opacity cross-fade carries no motion to be sick from,
+    which is why lightbox.tsx gates the transform and leaves the fade alone.
+    That difference is exactly what a fixed timeout turns into a flake.
+  */
+  await dialog.waitFor({ state: "detached", timeout: 2000 }).catch(() => {})
+  ok((await dialog.count()) === 0, "Escape still closes under reduced motion")
+
+  await browser.close()
+}
+
+/*
+  23. Case-study overflow — §5, all three breakpoints. The `pre` block is the
+  new risk here: a long code line that widens the document instead of scrolling
+  inside its own container.
+*/
+console.log("\n[case study · overflow]")
+{
+  const browser = await chromium.launch()
+  for (const width of [375, 768, 1440]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    await page.goto(studyUrl, { waitUntil: "networkidle" })
+    const scrollW = await page.evaluate(() => document.documentElement.scrollWidth)
+    ok(scrollW <= width + 1, width + "px: no horizontal overflow (scrollWidth " + scrollW + ")")
+    await page.close()
+  }
+  await browser.close()
+}
+
+/* 24. The case-study client chunks must not carry the enumeration either. */
+console.log("\n[case study · bundle]")
+{
+  const chunks = [...new Set(studyHtml.match(/\/_next\/static\/[^"']+\.js/g) ?? [])]
+  ok(chunks.length > 0, "found " + chunks.length + " client chunks to scan")
+
+  const leaked = []
+  for (const chunk of chunks) {
+    const body = await (await fetch(ORIGIN + chunk)).text()
+    for (const code of RESERVED) {
+      if (new RegExp('["\'`]' + code + '["\'`]').test(body)) leaked.push(code + " in " + chunk)
+    }
+  }
+  ok(
+    leaked.length === 0,
+    "no reserved code in any case-study chunk" + (leaked.length ? ": " + leaked.join(", ") : ""),
+  )
 }
 
 console.log(

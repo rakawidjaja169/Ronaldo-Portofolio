@@ -27,20 +27,27 @@ const PLACEHOLDER = /\bTODO\b|lorem ipsum|\/placeholder[./]|example\.com/i
  * Skip comment lines. Prose explaining the placeholder convention is not
  * itself a placeholder, and a guard that flags its own documentation trains
  * people to ignore it.
+ *
+ * The MDX form of a comment (an expression wrapping a JS block comment) is
+ * matched too, added with the .mdx sweep below.
  */
-const COMMENT = /^\s*(\/\/|\/\*|\*)/
+const COMMENT = /^\s*(\/\/|\/\*|\*|\{\/\*)/
 
 /**
  * Recursive: content/ is nested (content/personas/swe.ts). A flat readdir
  * silently skipped every persona file, so the guard passed while placeholders
  * sat one directory down — the exact thing it exists to catch.
+ *
+ * .mdx as well as .ts since M4. The case studies in content/projects/ are
+ * where the bulk of the placeholder prose now lives; a .ts-only sweep would
+ * have let six files of lorem ipsum deploy under a passing check.
  */
 async function collect(dir) {
   const out = []
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) out.push(...(await collect(full)))
-    else if (entry.name.endsWith(".ts")) out.push(full)
+    else if (entry.name.endsWith(".ts") || entry.name.endsWith(".mdx")) out.push(full)
   }
   return out
 }

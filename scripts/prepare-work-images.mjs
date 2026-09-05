@@ -13,7 +13,8 @@
  * PUBLICATION GATE. `SETS` below lists only the projects cleared to show real
  * screenshots publicly. Five of the six are an employer's internal admin tools
  * and that permission is still open (see docs/roadmap.md M3). Everything not
- * listed renders `_placeholder.webp` instead. Granting permission later means
+ * listed renders a generated schematic instead — see
+ * scripts/generate-app-visuals.mjs. Granting permission later means
  * adding one entry here and re-running — no component changes.
  *
  * Sources are DELETED from public/ after conversion. They remain in git history
@@ -29,7 +30,7 @@ import sharp from "sharp"
 const PUBLIC = path.join(process.cwd(), "public")
 const OUT_DIR = path.join(PUBLIC, "work")
 
-/** Cleared for publication. Everything else gets the placeholder. */
+/** Cleared for publication. Everything else gets a generated schematic. */
 const SETS = [
   {
     prefix: "online_admission",
@@ -86,40 +87,16 @@ for (const set of SETS) {
 }
 
 /*
-  Placeholder card image for projects whose screenshots are not cleared. A flat
-  accent-quiet wash over the base colour, at exact thumb dimensions so the grid
-  reserves the same box and CLS stays 0. Deliberately not a fake screenshot.
-*/
-const placeholder = await sharp({
-  create: {
-    width: THUMB.width,
-    height: THUMB.height,
-    channels: 3,
-    background: "#242424",
-  },
-})
-  .composite([
-    {
-      input: Buffer.from(
-        `<svg width="${THUMB.width}" height="${THUMB.height}" xmlns="http://www.w3.org/2000/svg">
-           <defs>
-             <radialGradient id="g" cx="50%" cy="40%" r="70%">
-               <stop offset="0%" stop-color="#ff914d" stop-opacity="0.16"/>
-               <stop offset="100%" stop-color="#ff914d" stop-opacity="0"/>
-             </radialGradient>
-           </defs>
-           <rect width="100%" height="100%" fill="url(#g)"/>
-         </svg>`,
-      ),
-      top: 0,
-      left: 0,
-    },
-  ])
-  .webp({ quality: QUALITY })
-  .toBuffer()
+  The flat `_placeholder.webp` this script used to emit is gone. Every project
+  outside SETS now carries a distinct generated schematic instead — see
+  scripts/generate-app-visuals.mjs. One wash repeated five times read as a
+  missing asset rather than as a decision.
 
-await writeFile(path.join(OUT_DIR, "_placeholder.webp"), placeholder)
-console.log(`\n_placeholder.webp  ${THUMB.width}x${THUMB.height}  ${kb(placeholder)}`)
+  THE GATE ABOVE IS NOT DEAD CODE. SETS is still the only thing that decides
+  which projects show real screenshots, and the raw sets are still in git at
+  c35dee3. If permission arrives for one of the internal tools, add it here and
+  drop its `visual(...)` call in content/work.ts.
+*/
 
 /* Sources out of public/. They live on in c35dee3. */
 const entries = await readdir(PUBLIC)

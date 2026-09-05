@@ -42,10 +42,19 @@ export default async function PersonaLayout({
       </a>
 
       {/*
-        Only the id and label reach the client. The nav never sees the persona
-        code or the registry — see the docblock in components/persona/nav.tsx.
+        Only the id, the label, and one path prefix reach the client. The nav
+        never sees the persona code as a code or the registry — see the
+        docblock in components/persona/nav.tsx.
+
+        `basePath` is unconditional, because this layout wraps the case studies
+        too. A bare `#work` resolves inside /swe/work/<slug> and goes nowhere;
+        `/swe#work` is a same-document fragment on /swe itself, so the browser
+        still scrolls in place there and the scroll-spy is untouched.
       */}
-      <PersonaNav sections={persona.sections.map(({ id, label }) => ({ id, label }))} />
+      <PersonaNav
+        sections={persona.sections.map(({ id, label }) => ({ id, label }))}
+        basePath={`/${persona.code}`}
+      />
 
       <main id="main" className="flex-1">
         {children}

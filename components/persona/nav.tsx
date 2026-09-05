@@ -9,6 +9,23 @@ import { cn } from "@/lib/utils"
 
 type NavSection = { id: string; label: string }
 
+type Props = {
+  sections: readonly NavSection[]
+  /**
+   * Prefix for the section anchors. Empty on the persona page itself, where
+   * `#work` is a same-document fragment and the browser scrolls in place.
+   * `/swe` on a case study, where a bare `#work` would resolve inside the
+   * case study and go nowhere.
+   *
+   * A PATH, NOT A PERSONA CODE, deliberately. This component still never
+   * imports content/personas.ts and still cannot enumerate the codes — it
+   * receives one string and concatenates it, exactly as it already receives
+   * its sections. The [isolation · links] group resolves every href against
+   * the origin, so a value that climbed out of the persona would fail there.
+   */
+  basePath?: string
+}
+
 /**
  * Persona nav — docs/design-system.md §6, §4.3.
  *
@@ -31,7 +48,7 @@ type NavSection = { id: string; label: string }
  * document reflow, and the page below carries constant top padding, so CLS
  * stays 0. Do not copy this to an in-flow element.
  */
-export function PersonaNav({ sections }: { sections: readonly NavSection[] }) {
+export function PersonaNav({ sections, basePath = "" }: Props) {
   const [condensed, setCondensed] = useState(false)
   const [active, setActive] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -139,7 +156,7 @@ export function PersonaNav({ sections }: { sections: readonly NavSection[] }) {
             {sections.map((s) => (
               <li key={s.id}>
                 <a
-                  href={`#${s.id}`}
+                  href={`${basePath}#${s.id}`}
                   aria-current={active === s.id ? "location" : undefined}
                   className={cn(
                     "inline-flex min-h-11 items-center rounded-sm px-3 font-mono text-meta uppercase transition-colors duration-150",
@@ -191,7 +208,7 @@ export function PersonaNav({ sections }: { sections: readonly NavSection[] }) {
             {sections.map((s, i) => (
               <li key={s.id}>
                 <a
-                  href={`#${s.id}`}
+                  href={`${basePath}#${s.id}`}
                   onClick={close}
                   aria-current={active === s.id ? "location" : undefined}
                   /* 40ms stagger, §4.2. `backwards` fill holds the from-state. */
