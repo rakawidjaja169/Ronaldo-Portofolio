@@ -79,10 +79,7 @@ console.log("\n[routing]")
   */
   const unknown = await fetch(ORIGIN + "/xyz", { redirect: "manual" })
   ok(unknown.status === 404, "/xyz returns 404, got " + unknown.status)
-  ok(
-    unknown.status < 300 || unknown.status >= 400,
-    "/xyz does not redirect (no Location header)",
-  )
+  ok(unknown.status < 300 || unknown.status >= 400, "/xyz does not redirect (no Location header)")
 
   for (const code of RESERVED) {
     const res = await fetch(ORIGIN + "/" + code, { redirect: "manual" })
@@ -145,7 +142,11 @@ console.log("\n[isolation · links]")
       offending.push(href + " -> persona " + first)
     }
   }
-  ok(offending.length === 0, "no anchor resolves to / or another persona" + (offending.length ? ": " + offending.join(", ") : ""))
+  ok(
+    offending.length === 0,
+    "no anchor resolves to / or another persona" +
+      (offending.length ? ": " + offending.join(", ") : ""),
+  )
 }
 
 /*
@@ -166,10 +167,13 @@ console.log("\n[isolation · bundle]")
     const body = await (await fetch(ORIGIN + chunk)).text()
     for (const code of RESERVED) {
       // Quoted, as it would appear in an inlined array of codes.
-      if (new RegExp('["\'`]' + code + '["\'`]').test(body)) leaked.push(code + " in " + chunk)
+      if (new RegExp("[\"'`]" + code + "[\"'`]").test(body)) leaked.push(code + " in " + chunk)
     }
   }
-  ok(leaked.length === 0, "no reserved code in any client chunk" + (leaked.length ? ": " + leaked.join(", ") : ""))
+  ok(
+    leaked.length === 0,
+    "no reserved code in any client chunk" + (leaked.length ? ": " + leaked.join(", ") : ""),
+  )
 }
 
 /* 5. Content renders without JS — product.md §9.6. */
@@ -218,7 +222,10 @@ console.log("\n[no javascript]")
       .filter((h) => getComputedStyle(h.parentElement).opacity !== "1")
       .map((h) => h.textContent.trim()),
   )
-  ok(hidden.length === 0, "section headings are opaque without JS" + (hidden.length ? ": " + hidden.join(", ") : ""))
+  ok(
+    hidden.length === 0,
+    "section headings are opaque without JS" + (hidden.length ? ": " + hidden.join(", ") : ""),
+  )
 
   await browser.close()
 }
@@ -242,7 +249,10 @@ console.log("[reduced motion]")
       .filter((h) => getComputedStyle(h.parentElement).opacity !== "1")
       .map((h) => h.textContent.trim()),
   )
-  ok(faded.length === 0, "all headings opaque under reduced motion" + (faded.length ? ": " + faded.join(", ") : ""))
+  ok(
+    faded.length === 0,
+    "all headings opaque under reduced motion" + (faded.length ? ": " + faded.join(", ") : ""),
+  )
   ok((await page.locator("canvas").count()) === 0, "no canvas mounts (§5 — poster only)")
 
   await browser.close()
@@ -371,9 +381,7 @@ console.log("\n[work grid]")
   for (let i = 0; i < 60 && !reached; i++) {
     await page.keyboard.press("Tab")
     reached = await page.evaluate(() =>
-      (document.activeElement?.getAttribute("aria-label") ?? "").startsWith(
-        "View screenshots of ",
-      ),
+      (document.activeElement?.getAttribute("aria-label") ?? "").startsWith("View screenshots of "),
     )
   }
   ok(reached, "a gallery trigger is reachable by Tab")
@@ -386,9 +394,7 @@ console.log("\n[work grid]")
   const dialog = page.locator('[role="dialog"][aria-modal="true"]')
   ok(await dialog.isVisible(), "Enter on the trigger opens the lightbox")
   ok(
-    await page.evaluate(
-      () => document.activeElement?.closest('[role="dialog"]') !== null,
-    ),
+    await page.evaluate(() => document.activeElement?.closest('[role="dialog"]') !== null),
     "focus lands inside the dialog",
   )
   ok(
@@ -407,7 +413,10 @@ console.log("\n[work grid]")
     await page.keyboard.press("ArrowRight")
     await page.waitForTimeout(120)
     const afterNext = (await counter.textContent())?.trim()
-    ok(afterNext !== before, "ArrowRight advances the counter (" + before + " -> " + afterNext + ")")
+    ok(
+      afterNext !== before,
+      "ArrowRight advances the counter (" + before + " -> " + afterNext + ")",
+    )
 
     await page.keyboard.press("ArrowLeft")
     await page.waitForTimeout(120)
@@ -425,9 +434,8 @@ console.log("\n[work grid]")
   await dialog.waitFor({ state: "detached", timeout: 2000 }).catch(() => {})
   ok((await dialog.count()) === 0, "Escape closes the lightbox")
   ok(
-    (await page.evaluate(
-      () => document.activeElement?.getAttribute("aria-label") ?? "",
-    )) === triggerLabel,
+    (await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")) ===
+      triggerLabel,
     "focus returns to the trigger that opened it",
   )
   ok(
@@ -481,7 +489,7 @@ console.log("\n[work grid]")
     })
   const boxBefore = await imageBoxHeight()
 
-  const chip = page.locator('#work button[aria-pressed]', { hasText: /^Payments$/i })
+  const chip = page.locator("#work button[aria-pressed]", { hasText: /^Payments$/i })
   ok((await chip.count()) === 1, "the Payments filter chip exists")
   await chip.click()
   await page.waitForTimeout(700)
@@ -499,7 +507,7 @@ console.log("\n[work grid]")
     "card image box holds its height through the filter (" + boxBefore + " -> " + boxAfter + ")",
   )
 
-  const all = page.locator('#work button[aria-pressed]', { hasText: /^All$/i })
+  const all = page.locator("#work button[aria-pressed]", { hasText: /^All$/i })
   await all.click()
   await page.waitForTimeout(500)
   ok((await cards.count()) === total, "the All chip restores every card")
@@ -524,7 +532,10 @@ console.log("\n[work grid · no javascript]")
       .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
       .map((el) => el.querySelector("h3")?.textContent?.trim() ?? "?"),
   )
-  ok(hidden.length === 0, "cards are opaque without JS" + (hidden.length ? ": " + hidden.join(", ") : ""))
+  ok(
+    hidden.length === 0,
+    "cards are opaque without JS" + (hidden.length ? ": " + hidden.join(", ") : ""),
+  )
 
   ok(
     (await page.locator('[role="dialog"]').count()) === 0,
@@ -538,7 +549,10 @@ console.log("\n[work grid · no javascript]")
 console.log("\n[work grid · reduced motion]")
 {
   const browser = await chromium.launch()
-  const page = await browser.newPage({ reducedMotion: "reduce", viewport: { width: 1280, height: 900 } })
+  const page = await browser.newPage({
+    reducedMotion: "reduce",
+    viewport: { width: 1280, height: 900 },
+  })
   await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
   await page.evaluate(() => document.getElementById("work")?.scrollIntoView())
   await page.waitForTimeout(600)
@@ -548,7 +562,10 @@ console.log("\n[work grid · reduced motion]")
       .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
       .map((el) => el.querySelector("h3")?.textContent?.trim() ?? "?"),
   )
-  ok(faded.length === 0, "cards are opaque under reduced motion" + (faded.length ? ": " + faded.join(", ") : ""))
+  ok(
+    faded.length === 0,
+    "cards are opaque under reduced motion" + (faded.length ? ": " + faded.join(", ") : ""),
+  )
 
   await page.locator('#work button[aria-label^="View screenshots of "]').first().click()
   const dialog = page.locator('[role="dialog"][aria-modal="true"]')
@@ -594,7 +611,9 @@ console.log("\n[timeline]")
   /* §7 heading order: the section <h2>, then <h3>s. No level skipped. */
   const levels = await page.evaluate(() =>
     [
-      ...document.querySelectorAll("#experience h1, #experience h2, #experience h3, #experience h4"),
+      ...document.querySelectorAll(
+        "#experience h1, #experience h2, #experience h3, #experience h4",
+      ),
     ].map((h) => Number(h.tagName[1])),
   )
   ok(levels[0] === 2, "section opens at <h2>, got h" + levels[0])
@@ -799,7 +818,6 @@ console.log("\n[experience · skills · contact · reduced motion]")
 
   await browser.close()
 }
-
 
 /* ------------------------------------------------------------------ M4 */
 
@@ -1110,12 +1128,401 @@ console.log("\n[case study · bundle]")
   for (const chunk of chunks) {
     const body = await (await fetch(ORIGIN + chunk)).text()
     for (const code of RESERVED) {
-      if (new RegExp('["\'`]' + code + '["\'`]').test(body)) leaked.push(code + " in " + chunk)
+      if (new RegExp("[\"'`]" + code + "[\"'`]").test(body)) leaked.push(code + " in " + chunk)
     }
   }
   ok(
     leaked.length === 0,
     "no reserved code in any case-study chunk" + (leaked.length ? ": " + leaked.join(", ") : ""),
+  )
+}
+
+/*
+  25. Blog routing — §2.6, §5.3.
+
+  Slugs come from the list page's own hrefs, not from content/blog.ts — the
+  same rule as [case study · routing] and the RESERVED list: a test that reads
+  the source under test cannot catch that source being wrong.
+*/
+const blogUrl = ORIGIN + "/" + BUILT + "/blog"
+const blogHtml = await (await fetch(blogUrl)).text()
+
+const POSTS = [
+  ...new Set(
+    [...blogHtml.matchAll(new RegExp('href="/' + BUILT + '/blog/([^"/]+)"', "g"))].map((m) => m[1]),
+  ),
+]
+
+console.log("\n[blog · routing]")
+{
+  ok(POSTS.length > 0, "blog page 1 links to " + POSTS.length + " posts")
+
+  for (const slug of POSTS) {
+    const res = await fetch(ORIGIN + "/" + BUILT + "/blog/" + slug, { redirect: "manual" })
+    ok(res.status === 200, "/" + BUILT + "/blog/" + slug + " returns 200, got " + res.status)
+  }
+
+  const page2 = await fetch(ORIGIN + "/" + BUILT + "/blog/page/2", { redirect: "manual" })
+  ok(page2.status === 200, "/blog/page/2 returns 200, got " + page2.status)
+
+  /* §2.6: a 404, never a redirect that confirms the route shape exists. */
+  for (const path of ["/blog/nope", "/blog/page/1", "/blog/page/9"]) {
+    const res = await fetch(ORIGIN + "/" + BUILT + path, { redirect: "manual" })
+    ok(res.status === 404, BUILT + path + " returns 404, got " + res.status)
+    ok(res.headers.get("location") === null, BUILT + path + " sends no Location header")
+  }
+
+  /*
+    A real slug under a RESERVED code — the combination that would leak, since
+    the slug exists and only the persona guard stands between it and a 200.
+  */
+  for (const code of RESERVED) {
+    const list = await fetch(ORIGIN + "/" + code + "/blog", { redirect: "manual" })
+    ok(list.status === 404, "/" + code + "/blog returns 404, got " + list.status)
+    const post = await fetch(ORIGIN + "/" + code + "/blog/" + POSTS[0], { redirect: "manual" })
+    ok(post.status === 404, "/" + code + "/blog/" + POSTS[0] + " returns 404, got " + post.status)
+  }
+}
+
+const postUrl = ORIGIN + "/" + BUILT + "/blog/" + POSTS[0]
+const postHtml = await (await fetch(postUrl)).text()
+const page2Html = await (await fetch(ORIGIN + "/" + BUILT + "/blog/page/2")).text()
+
+/*
+  26. Blog indexing — §2.4. The non-inheritance assertion, restated for a third
+  route family: generateMetadata inherits from the parent LAYOUT, which exports
+  none, so each of these three pages either restates robots or has none.
+*/
+console.log("\n[blog · indexing]")
+{
+  for (const [label, html] of [
+    ["list", blogHtml],
+    ["page 2", page2Html],
+    ["post", postHtml],
+  ]) {
+    const meta = html.match(/<meta name="robots" content="([^"]*)"/i)
+    ok(meta !== null, label + " emits a robots meta tag")
+    ok(/noindex/i.test(meta?.[1] ?? ""), label + " robots contains noindex — got: " + meta?.[1])
+    ok(/nofollow/i.test(meta?.[1] ?? ""), label + " robots contains nofollow")
+    ok(!/<link rel="canonical"/i.test(html), label + " emits no canonical link (§2.4)")
+  }
+
+  const sitemap = await (await fetch(ORIGIN + "/sitemap.xml")).text()
+  ok(!/\/blog/.test(sitemap), "sitemap.xml lists no blog path")
+}
+
+/* 27. Blog isolation — §2.1-2.3. Prev/next and the paginator are new surfaces. */
+console.log("\n[blog · isolation]")
+{
+  for (const [label, url, html] of [
+    ["list", blogUrl, blogHtml],
+    ["post", postUrl, postHtml],
+  ]) {
+    const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1])
+    ok(hrefs.length > 0, label + ": found " + hrefs.length + " hrefs")
+
+    const offending = []
+    for (const href of hrefs) {
+      if (/^(mailto:|tel:|#)/.test(href)) continue
+      let resolved
+      try {
+        resolved = new URL(href, url)
+      } catch {
+        continue
+      }
+      if (resolved.origin !== ORIGIN) continue
+
+      const path = resolved.pathname.replace(/\/$/, "")
+      if (path === "") offending.push(href + " -> homepage")
+      const seg = path.split("/")[1]
+      if (seg && seg !== BUILT && RESERVED.includes(seg))
+        offending.push(href + " -> persona " + seg)
+    }
+    ok(
+      offending.length === 0,
+      label +
+        ": no anchor resolves to / or another persona" +
+        (offending.length ? ": " + offending.join(", ") : ""),
+    )
+  }
+
+  /* The nav's new blog link is a page link, not a fragment, so the existing
+     "no bare fragment" assertion does not cover it. These do. */
+  ok(
+    blogHtml.includes('href="/' + BUILT + '"'),
+    "blog list links back to /" + BUILT + " and nowhere higher",
+  )
+  ok(postHtml.includes('href="/' + BUILT + '/blog"'), "post links back to /" + BUILT + "/blog")
+}
+
+/* 28. Pagination — §5.3 "paginated at 10". */
+console.log("\n[blog · pagination]")
+{
+  const slugsOn = (html) => [
+    ...new Set(
+      [...html.matchAll(new RegExp('href="/' + BUILT + '/blog/([^"/]+)"', "g"))].map((m) => m[1]),
+    ),
+  ]
+  const p1 = slugsOn(blogHtml)
+  const p2 = slugsOn(page2Html)
+
+  ok(p1.length === 10, "page 1 lists exactly 10 posts, got " + p1.length)
+  ok(p2.length === 2, "page 2 lists the remaining 2 posts, got " + p2.length)
+  const overlap = p1.filter((s) => p2.includes(s))
+  ok(overlap.length === 0, "the two pages are disjoint" + (overlap.length ? ": " + overlap : ""))
+
+  /* Newest first: the datetime attributes must descend across both pages. */
+  const dates = [
+    /* Case-insensitive: React serialises the JSX prop name, so the markup
+       carries `dateTime="…"`, not the HTML-spec lowercase form. */
+    ...[...blogHtml.matchAll(/datetime="(\d{4}-\d{2}-\d{2})"/gi)].map((m) => m[1]),
+    ...[...page2Html.matchAll(/datetime="(\d{4}-\d{2}-\d{2})"/gi)].map((m) => m[1]),
+  ]
+  ok(dates.length === 12, "12 dated cards across both pages, got " + dates.length)
+  const descending = dates.every((d, i) => i === 0 || dates[i - 1] >= d)
+  ok(descending, "cards are newest-first across both pages: " + dates.join(" "))
+
+  /* Page 1 has one address: the paginator points at /blog, never /blog/page/1. */
+  ok(
+    page2Html.includes('href="/' + BUILT + '/blog"'),
+    "page 2 links back to /blog, not /blog/page/1",
+  )
+  ok(
+    !page2Html.includes('href="/' + BUILT + '/blog/page/1"'),
+    "no link anywhere points at /blog/page/1",
+  )
+  ok(blogHtml.includes('href="/' + BUILT + '/blog/page/2"'), "page 1 links forward to /blog/page/2")
+}
+
+/*
+  29. Outline — THE DRIFT GUARD, and the reason lib/slugify.ts exists as one
+  function with two callers. content/blog.ts derives the outline hrefs from the
+  raw markdown; mdx-components.tsx sets the ids from the rendered children. If
+  those two ever disagree — a heading with inline code, say, which is the
+  documented ceiling — every outline link silently stops resolving and nothing
+  else in this file notices. This is what notices.
+*/
+console.log("\n[blog · outline]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  await page.goto(postUrl, { waitUntil: "networkidle" })
+
+  const ids = await page.evaluate(() =>
+    [...document.querySelectorAll("main h2[id], main h3[id]")].map((h) => h.id),
+  )
+  /* The desktop aside only — the mobile <details> renders the same list, and
+     counting both would compare a doubled set against a single one. */
+  const hrefs = await page.evaluate(() => [
+    ...new Set(
+      [...document.querySelectorAll('aside a[href^="#"]')].map((a) =>
+        a.getAttribute("href").slice(1),
+      ),
+    ),
+  ])
+
+  ok(ids.length > 0, "post renders " + ids.length + " headings with ids")
+  ok(hrefs.length > 0, "outline renders " + hrefs.length + " links")
+  const missing = ids.filter((id) => !hrefs.includes(id))
+  const dangling = hrefs.filter((h) => !ids.includes(h))
+  ok(
+    missing.length === 0 && dangling.length === 0,
+    "every heading id has an outline link and vice versa" +
+      (missing.length ? " — headings with no link: " + missing.join(", ") : "") +
+      (dangling.length ? " — links with no heading: " + dangling.join(", ") : ""),
+  )
+
+  /*
+    Scroll-spy: the active link tracks the heading in the reading band.
+
+    A MID-DOCUMENT heading, NOT the last one. These posts are ~1670px tall in a
+    900px viewport, so the last two headings can never reach the top band — the
+    page runs out of scroll first and an earlier heading stays correctly active.
+    Asserting on the final heading would fail a component that is behaving.
+
+    And it POLLS for the expected href rather than waiting on the link being
+    "visible": the previously-active link is already visible, so that wait
+    resolves instantly and reads the state before the observer has fired.
+  */
+  const target = ids[1] ?? ids[0]
+  await page.evaluate((id) => document.getElementById(id).scrollIntoView(), target)
+  const active = await page
+    .waitForFunction(
+      (id) =>
+        document.querySelector('aside a[aria-current="location"]')?.getAttribute("href") ===
+        "#" + id,
+      target,
+      { timeout: 3000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  ok(active, "aria-current lands on the heading scrolled into the band (#" + target + ")")
+
+  /* Click-to-jump: the hash changes and the heading is actually in view. */
+  await page.evaluate(() => window.scrollTo(0, 0))
+  const jumpTo = ids[ids.length - 1]
+  await page.locator('aside a[href="#' + jumpTo + '"]').click()
+  await page.waitForFunction((id) => location.hash === "#" + id, jumpTo, { timeout: 3000 })
+  ok(true, "clicking an outline link sets location.hash to #" + jumpTo)
+  /*
+    Polled, not read once: the hash updates the instant the link is followed
+    while the scroll itself is animated, so a single read lands mid-flight and
+    reports a heading that is about to be in view as though it were not.
+  */
+  const inView = await page
+    .waitForFunction(
+      (id) => {
+        const box = document.getElementById(id).getBoundingClientRect()
+        return box.top >= 0 && box.top < window.innerHeight
+      },
+      jumpTo,
+      { timeout: 3000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  ok(inView, "the target heading is in the viewport, below the fixed nav")
+
+  await browser.close()
+}
+
+/* 30. Blog without JS — the prose IS the page, and the outline still opens. */
+console.log("\n[blog · no javascript]")
+{
+  const browser = await chromium.launch()
+  /*
+    375px wide, because the outline renders twice: a `<details>` below `md` and
+    a sticky `<aside>` at and above it. At a desktop viewport the disclosure is
+    in the DOM but display:none and the click below times out — the component
+    would be right and the viewport wrong.
+  */
+  const ctx = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: { width: 375, height: 800 },
+  })
+  const page = await ctx.newPage()
+  await page.goto(postUrl, { waitUntil: "load" })
+
+  const paras = await page.locator("main p").count()
+  ok(paras > 0, "post prose renders without JS (" + paras + " paragraphs)")
+  ok((await page.locator("main h2").count()) > 0, "body headings render without JS")
+
+  /* <details> is the whole reason the mobile outline is not a button. */
+  const details = page.locator("details")
+  ok((await details.count()) > 0, "outline ships as a native <details>")
+  await details.first().locator("summary").click()
+  ok(await details.first().evaluate((el) => el.open), "the disclosure opens with JS disabled")
+  ok(
+    (await details.first().locator('a[href^="#"]').count()) > 0,
+    "outline links are present inside it",
+  )
+
+  /* Parent opacity, per the M2 wrapper trap. */
+  const hidden = await page.evaluate(() =>
+    [...document.querySelectorAll("main p, main h1, main h2")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.textContent.trim().slice(0, 40)),
+  )
+  ok(
+    hidden.length === 0,
+    "post prose is opaque without JS" + (hidden.length ? ": " + hidden.join(" | ") : ""),
+  )
+
+  /* And the list paginates without a runtime — plain anchors, server-rendered. */
+  const list = await ctx.newPage()
+  await list.goto(blogUrl, { waitUntil: "load" })
+  ok((await list.locator("main article").count()) === 10, "10 cards render without JS")
+  await list.locator('nav[aria-label="Blog pages"] a').first().click()
+  await list.waitForURL(/\/blog\/page\/2$/, { timeout: 5000 })
+  ok(true, "the paginator navigates to page 2 without JS")
+
+  await browser.close()
+}
+
+/* 31. Blog under reduced motion — §4.4. */
+console.log("\n[blog · reduced motion]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({
+    reducedMotion: "reduce",
+    viewport: { width: 1280, height: 900 },
+  })
+  await page.goto(blogUrl, { waitUntil: "networkidle" })
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await page.waitForTimeout(600)
+
+  const faded = await page.evaluate(() =>
+    [...document.querySelectorAll("main h1, main h3, main article p")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.textContent.trim().slice(0, 40)),
+  )
+  ok(
+    faded.length === 0,
+    "blog cards are opaque under reduced motion" + (faded.length ? ": " + faded.join(" | ") : ""),
+  )
+
+  await browser.close()
+}
+
+/*
+  32. Blog overflow — §5, all three breakpoints. The sticky aside is the new
+  risk: a two-column grid whose prose column has no min-width will be widened
+  by a single long `pre` line instead of scrolling inside it.
+*/
+console.log("\n[blog · overflow]")
+{
+  const browser = await chromium.launch()
+  for (const width of [375, 768, 1440]) {
+    for (const [label, url] of [
+      ["list", blogUrl],
+      ["post", postUrl],
+    ]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      await page.goto(url, { waitUntil: "networkidle" })
+      const scrollW = await page.evaluate(() => document.documentElement.scrollWidth)
+      ok(
+        scrollW <= width + 1,
+        width + "px " + label + ": no horizontal overflow (scrollWidth " + scrollW + ")",
+      )
+      await page.close()
+    }
+  }
+
+  /* The aside must sit beside the prose on desktop, never on top of it. */
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  await page.goto(postUrl, { waitUntil: "networkidle" })
+  const overlap = await page.evaluate(() => {
+    const aside = document.querySelector("aside")
+    const article = document.querySelector("main article")
+    if (!aside || !article) return "missing element"
+    const a = aside.getBoundingClientRect()
+    const b = article.getBoundingClientRect()
+    return a.left < b.right && b.left < a.right ? "overlapping" : null
+  })
+  ok(overlap === null, "the sticky outline does not overlap the prose: " + overlap)
+  await browser.close()
+}
+
+/* 33. The blog client chunks must not carry the enumeration either. */
+console.log("\n[blog · bundle]")
+{
+  const chunks = [
+    ...new Set([
+      ...(blogHtml.match(/\/_next\/static\/[^"']+\.js/g) ?? []),
+      ...(postHtml.match(/\/_next\/static\/[^"']+\.js/g) ?? []),
+    ]),
+  ]
+  ok(chunks.length > 0, "found " + chunks.length + " client chunks to scan")
+
+  const leaked = []
+  for (const chunk of chunks) {
+    const body = await (await fetch(ORIGIN + chunk)).text()
+    for (const code of RESERVED) {
+      if (new RegExp("[\"'`]" + code + "[\"'`]").test(body)) leaked.push(code + " in " + chunk)
+    }
+  }
+  ok(
+    leaked.length === 0,
+    "no reserved code in any blog chunk" + (leaked.length ? ": " + leaked.join(", ") : ""),
   )
 }
 

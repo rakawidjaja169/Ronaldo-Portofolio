@@ -327,18 +327,93 @@ The file was restored and the build re-verified green.
   `info: true` — measured but unrated — which is easy to read as "passing".
 ---
 
-## M5 — Blog
+## M5 — Blog ✅
 
-- `content/blog/swe/*.mdx`, same validated pipeline.
+- `content/blog/swe/*.mdx`, same validated pipeline as M4 — `export const meta`, zod on the
+  whole module, a throw naming the file and the failing key.
 - `/[persona]/blog` list: title, date, reading time, tags, newest first, paginated at 10.
-- `/[persona]/blog/[slug]`: title, date, author, reading time, MDX body.
-- Outline sidebar built from `h2`/`h3` at build time, scroll-spy with `aria-current`,
-  click-to-jump, disclosure collapse on mobile.
-- Prev/next links scoped to the same persona.
+- `/[persona]/blog/page/[n]`: pages 2+. **Page 1 has one address** — `/blog/page/1` is never
+  generated and is a 404, so there is no duplicate route to keep `noindex` on in two places.
+- `/[persona]/blog/[slug]`: title, date, author, reading time, MDX body, newer/older links.
+- Outline built from `h2`/`h3` at build time, scroll-spy with `aria-current="location"`,
+  click-to-jump, `<details>` disclosure on mobile and a sticky rail from `md` up.
 - Designed empty state when a persona has no posts.
 
 **Done when:** outline tracks scroll accurately, headings are deep-linkable, list paginates
-correctly.
+correctly. ✅ — all three asserted in `[blog · outline]` and `[blog · pagination]`.
+
+### Two things a later reader will be tempted to change, and should not
+
+1. **THE OUTLINE IS DERIVED FROM THE MDX SOURCE, BY `content/blog.ts`.** It reads the `.mdx`
+   with `node:fs` at build time and produces both the outline and the reading time from that
+   one read. **Do not add `rehype-slug` alongside it.** That would put the heading ids in a
+   different pipeline from the outline that has to match them — two passes, two packages, and
+   a drift that shows up as outline links that silently stop resolving. The ids come from
+   `lib/slugify.ts`, one function with exactly two callers: `content/blog.ts` and
+   `mdx-components.tsx`. They cannot drift because they are the same call.
+
+   `analyze()` is **build-time only** and must stay that way. Every blog route is
+   `dynamicParams = false` and fully prerendered; `content/` is not in the `output:
+   "standalone"` bundle, so flipping `dynamicParams` to `true` turns this into an ENOENT in
+   production, not a slow page.
+
+2. **`slugify` requires plain-text headings.** An `h2` containing inline code or a link
+   flattens differently on the two sides — `content/blog.ts` sees raw markdown,
+   `mdx-components.tsx` sees React children. Rather than write a markdown-inline normalizer
+   twice, the constraint is stated and **enforced**: `[blog · outline]` collects every rendered
+   `main h2[id], h3[id]` and every `aside a[href^="#"]` and fails on any set difference, naming
+   the offending ids. That assertion is what makes the normalizer unnecessary.
+
+Also worth keeping: the static segment `page/` wins over the sibling `[slug]`, so **`page` is
+a reserved post slug**. That is the whole cost of this route shape and it is cheaper than
+inventing `/blog/p/2`.
+
+### Measured (local, `npm run build && npm start`)
+
+| Gate | Result |
+| --- | --- |
+| First Load JS, `/[persona]/blog/[slug]` | 112 kB — budget 200 kB |
+| First Load JS, `/[persona]/blog` and `/blog/page/[n]` | 144 kB |
+| Static routes emitted | 29 total, 14 new (12 posts + list + page 2) |
+| `tests/persona.mjs` | 34 groups, all pass — 9 new |
+| `tests/homepage.mjs` | all pass |
+| Malformed `meta.date` | build **fails**, naming `content/blog/swe/post-03.mdx` |
+| Lighthouse mobile, post | Perf 90 · A11y 100 · BP 100 · SEO 63 |
+| Lighthouse mobile, `/swe` control, same session | Perf 86 · SEO 66 |
+| Horizontal overflow, 375 / 768 / 1440 | none, list and post |
+| Prose measure | 37ch at 375px, 47ch at 768px, 62ch at 1440px |
+| Outline mode | `<details>` at 375px, sticky `<aside>` at 768 and 1440 |
+
+**SEO 63 is the correct result**, for the reason M4 already recorded: the only failing audit
+is `is-crawlable`, which is `noindex` working. The 3-point gap from the control is the same
+per-run noise the perf numbers carry. Any change that raises this number has broken §2.4.
+
+**The zod claim was proved, not asserted.** `post-03`'s date was corrupted to `2026-8-14`;
+the build failed with `Error: Invalid blog post in content/blog/swe/post-03.mdx:` and named
+the failing path. The file was restored and the build re-verified green.
+
+### Three test-authoring traps this milestone turned up
+
+1. **React serialises the JSX prop name, so the markup carries `dateTime="…"`, not the
+   HTML-spec lowercase `datetime`.** A case-sensitive grep for the latter matched zero of
+   twelve dated cards and the "newest-first" assertion then passed **vacuously over an empty
+   array**. Both regexes are `/i` now. A sort assertion that cannot fail on no data is worse
+   than no assertion.
+2. **`waitFor({ state: "visible" })` on the active outline link resolves instantly** — the
+   *previously* active link is already visible. Both scroll-spy assertions poll with
+   `waitForFunction` for the expected href instead.
+3. **The last heading in a short post can never reach the scroll-spy band.** These posts are
+   ~1670px in a 900px viewport, so the page runs out of scroll while the final heading sits
+   at `top: 349` and an earlier one stays correctly active. `[blog · outline]` asserts on a
+   mid-document heading; asserting on the last one fails a component that is behaving.
+
+### Carried out of M5
+
+- **Twelve posts' worth of prose is placeholder**, named by `check:content` alongside
+  everything else in the carried-forward list, and blocking deploy.
+- **The empty state is unreachable today** — one built persona, twelve posts. It is written
+  and reviewed but not exercised by a test, and is recorded here as such rather than claimed
+  as covered.
 
 ---
 

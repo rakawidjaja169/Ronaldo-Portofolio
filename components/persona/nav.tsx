@@ -24,6 +24,18 @@ type Props = {
    * the origin, so a value that climbed out of the persona would fail there.
    */
   basePath?: string
+  /**
+   * `/swe/blog`, when the persona has posts. ANOTHER PLAIN STRING, exactly as
+   * `basePath` is — still no persona code as a code, still no registry import.
+   *
+   * Not a `sections` entry: `PersonaSection.id` is both the scroll-spy key and
+   * a real section landmark on the page, so a fake entry would put the blog
+   * into the observer's element list and into `persona.sections.map` on the
+   * page. This is a page link, not an anchor, which is also why the "no bare
+   * fragment" assertion (it filters on `h.includes("#")`) does not cover it —
+   * `[isolation · links]` resolves every href and does.
+   */
+  blogHref?: string
 }
 
 /**
@@ -48,7 +60,7 @@ type Props = {
  * document reflow, and the page below carries constant top padding, so CLS
  * stays 0. Do not copy this to an in-flow element.
  */
-export function PersonaNav({ sections, basePath = "" }: Props) {
+export function PersonaNav({ sections, basePath = "", blogHref }: Props) {
   const [condensed, setCondensed] = useState(false)
   const [active, setActive] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -167,6 +179,17 @@ export function PersonaNav({ sections, basePath = "" }: Props) {
                 </a>
               </li>
             ))}
+
+            {blogHref ? (
+              <li>
+                <a
+                  href={blogHref}
+                  className="inline-flex min-h-11 items-center rounded-sm px-3 font-mono text-meta uppercase text-ink-muted transition-colors duration-150 hover:text-ink"
+                >
+                  Writing
+                </a>
+              </li>
+            ) : null}
           </ul>
 
           <ThemeToggle />
@@ -219,6 +242,19 @@ export function PersonaNav({ sections, basePath = "" }: Props) {
                 </a>
               </li>
             ))}
+
+            {blogHref ? (
+              <li>
+                <a
+                  href={blogHref}
+                  onClick={close}
+                  className="animate-rise-in inline-flex min-h-11 items-center font-display text-h1 font-semibold"
+                  style={{ animationDelay: `${sections.length * 0.04}s` }}
+                >
+                  Writing
+                </a>
+              </li>
+            ) : null}
           </ul>
         </div>
       ) : null}

@@ -54,6 +54,7 @@ export default async function PersonaLayout({
       <PersonaNav
         sections={persona.sections.map(({ id, label }) => ({ id, label }))}
         basePath={`/${persona.code}`}
+        blogHref={`/${persona.code}/blog`}
       />
 
       <main id="main" className="flex-1">

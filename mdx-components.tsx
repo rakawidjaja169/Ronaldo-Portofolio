@@ -1,7 +1,8 @@
-import { type ComponentPropsWithoutRef, type JSX } from "react"
+import { type ComponentPropsWithoutRef, type JSX, type ReactNode } from "react"
 import type { MDXComponents } from "mdx/types"
 
 import { Callout } from "@/components/persona/callout"
+import { slugify } from "@/lib/slugify"
 
 /**
  * MDX element mapping — docs/design-system.md §2.1, §2.2.
@@ -19,6 +20,17 @@ import { Callout } from "@/components/persona/callout"
  * no size. An unclassed `## ` here would inherit the body size and read as
  * bold prose rather than as a heading.
  *
+ * h2/h3 GET IDS FROM lib/slugify.ts, and content/blog.ts builds the post
+ * outline with the same call on the same heading text — one function, so an
+ * outline link and its heading cannot drift apart. Do not add rehype-slug: it
+ * would compute the same ids in a second pipeline the outline cannot see.
+ * The constraint that comes with it is plain-text headings only (see the
+ * slugify docblock); `[blog · outline]` in tests/persona.mjs enforces it by
+ * comparing every rendered id against every outline href.
+ *
+ * `scroll-mt-24` on both, so a deep link parks the heading below the fixed nav
+ * rather than underneath it — the same value Section already uses.
+ *
  * h1 IS ABSENT ON PURPOSE. The case-study page renders the title as the
  * document's only h1; an author writing `# ` in the body would produce a
  * second one and break the §7 heading order. Left unmapped, it still renders —
@@ -26,11 +38,32 @@ import { Callout } from "@/components/persona/callout"
  */
 type Props<T extends keyof JSX.IntrinsicElements> = ComponentPropsWithoutRef<T>
 
+/**
+ * Flattens heading children to a string. Plain text and nested arrays only —
+ * anything else (inline code, a link) yields "" for that part and the id stops
+ * matching what content/blog.ts derived from the raw markdown, which is the
+ * documented ceiling on slugify rather than a bug to patch here.
+ */
+function toText(node: ReactNode): string {
+  if (typeof node === "string") return node
+  if (typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(toText).join("")
+  return ""
+}
+
 /* Not a hook despite the name — the name is the @next/mdx contract. */
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
-    h2: (props: Props<"h2">) => <h2 className="mt-14 text-h2" {...props} />,
-    h3: (props: Props<"h3">) => <h3 className="mt-8 text-h3" {...props} />,
+    h2: ({ children, ...props }: Props<"h2">) => (
+      <h2 id={slugify(toText(children))} className="mt-14 scroll-mt-24 text-h2" {...props}>
+        {children}
+      </h2>
+    ),
+    h3: ({ children, ...props }: Props<"h3">) => (
+      <h3 id={slugify(toText(children))} className="mt-8 scroll-mt-24 text-h3" {...props}>
+        {children}
+      </h3>
+    ),
 
     p: (props: Props<"p">) => <p className="mt-5 text-body-l text-ink-muted" {...props} />,
 
@@ -40,10 +73,16 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       hangs on the inline-start edge, which flips with the writing direction.
     */
     ul: (props: Props<"ul">) => (
-      <ul className="mt-5 list-disc space-y-2 ps-6 text-body-l text-ink-muted marker:text-accent" {...props} />
+      <ul
+        className="mt-5 list-disc space-y-2 ps-6 text-body-l text-ink-muted marker:text-accent"
+        {...props}
+      />
     ),
     ol: (props: Props<"ol">) => (
-      <ol className="mt-5 list-decimal space-y-2 ps-6 text-body-l text-ink-muted marker:font-mono marker:text-accent" {...props} />
+      <ol
+        className="mt-5 list-decimal space-y-2 ps-6 text-body-l text-ink-muted marker:font-mono marker:text-accent"
+        {...props}
+      />
     ),
     li: (props: Props<"li">) => <li className="ps-1" {...props} />,
 
@@ -90,7 +129,10 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       />
     ),
     code: (props: Props<"code">) => (
-      <code className="rounded-sm bg-surface-2 px-1.5 py-0.5 font-mono text-body-s text-ink" {...props} />
+      <code
+        className="rounded-sm bg-surface-2 px-1.5 py-0.5 font-mono text-body-s text-ink"
+        {...props}
+      />
     ),
 
     /* Caller-supplied overrides win — the @next/mdx contract. */
