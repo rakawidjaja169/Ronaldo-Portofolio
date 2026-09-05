@@ -553,6 +553,235 @@ console.log("\n[work grid · reduced motion]")
   await browser.close()
 }
 
+/* 12. Timeline — product.md §5.1, design-system.md §6, §4.3. */
+console.log("\n[timeline]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+
+  const list = page.locator("#experience ol").first()
+  ok((await list.count()) === 1, "timeline is an <ol> (§6 — the order is the meaning)")
+
+  const entries = page.locator("#experience ol > li")
+  const total = await entries.count()
+  ok(total > 0, "timeline renders " + total + " entries")
+
+  const roles = await page.locator("#experience ol > li h3").allTextContents()
+  ok(
+    roles.length === total && roles.every((t) => t.trim().length > 0),
+    "every entry has a non-empty <h3> role",
+  )
+
+  /* §7 heading order: the section <h2>, then <h3>s. No level skipped. */
+  const levels = await page.evaluate(() =>
+    [
+      ...document.querySelectorAll("#experience h1, #experience h2, #experience h3, #experience h4"),
+    ].map((h) => Number(h.tagName[1])),
+  )
+  ok(levels[0] === 2, "section opens at <h2>, got h" + levels[0])
+  ok(
+    levels.every((lvl, i) => i === 0 || lvl - levels[i - 1] <= 1),
+    "no heading level is skipped: " + levels.join(","),
+  )
+
+  /* §2.2 — tabular figures, so the date column does not jitter between entries. */
+  const tabular = await page.evaluate(() => {
+    const meta = document.querySelector("#experience ol > li p")
+    return meta ? getComputedStyle(meta).fontVariantNumeric : ""
+  })
+  ok(/tabular-nums/.test(tabular), "entry dates use tabular figures, got: " + tabular)
+
+  /*
+    The rail is decoration and must stay out of the accessibility tree — the
+    <ol> carries every fact, so a screen reader loses nothing when it is hidden.
+  */
+  const railHidden = await page.evaluate(() => {
+    const ol = document.querySelector("#experience ol")
+    return Boolean(ol?.parentElement?.querySelector('[aria-hidden="true"]'))
+  })
+  ok(railHidden, "rail is aria-hidden")
+
+  /*
+    THE RAIL ACTUALLY DRAWS. A rail that never fills passes "a rail exists" and
+    still fails the reader, so this reads the fill's transform at the top of the
+    section and again past its bottom, and requires the two to differ.
+  */
+  const railScale = () =>
+    page.evaluate(() => {
+      const ol = document.querySelector("#experience ol")
+      const fill = ol?.parentElement?.querySelector('[aria-hidden="true"] > *')
+      return fill ? getComputedStyle(fill).transform : "none"
+    })
+
+  await page.evaluate(() => document.getElementById("experience")?.scrollIntoView())
+  await page.waitForTimeout(400)
+  const atTop = await railScale()
+  await page.evaluate(() => {
+    const el = document.getElementById("experience")
+    if (el) window.scrollTo(0, el.offsetTop + el.offsetHeight)
+  })
+  await page.waitForTimeout(400)
+  const atBottom = await railScale()
+  ok(atTop !== atBottom, "rail fill grows with scroll: " + atTop + " -> " + atBottom)
+
+  await browser.close()
+}
+
+/* 13. Skills — product.md §5.1, design-system.md §6, §7. */
+console.log("\n[skills]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+
+  const groups = await page.locator("#skills h3").allTextContents()
+  ok(groups.length > 0, "skills renders " + groups.length + " group headings")
+  ok(
+    groups.every((t) => t.trim().length > 0),
+    "every group heading is non-empty: " + groups.join(" · "),
+  )
+
+  const chips = page.locator("#skills li")
+  const chipCount = await chips.count()
+  ok(chipCount > 0, "chips render (" + chipCount + ")")
+
+  /*
+    A chip filters nothing in this section. A 44px target that does nothing when
+    pressed is a §7 defect, so these must be plain <li> — not buttons, not
+    links, not tabbable.
+  */
+  const interactive = await page.locator("#skills button, #skills a, #skills [tabindex]").count()
+  ok(interactive === 0, "no chip is interactive or focusable (" + interactive + " found)")
+
+  await browser.close()
+}
+
+/* 14. Contact — product.md §7. Direct links only. */
+console.log("\n[contact]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+
+  /*
+    §7 is "no form, no API route". Asserted page-wide rather than inside
+    #contact: "we decided not to add a form" is exactly the kind of decision a
+    later commit quietly reverses, and it could reappear anywhere on the page.
+  */
+  ok((await page.locator("form").count()) === 0, "no <form> anywhere on the page (§7)")
+  ok((await page.locator("input, textarea").count()) === 0, "no text inputs anywhere (§7)")
+
+  const count = await page.locator("#contact a").count()
+  ok(count > 0, "contact renders " + count + " links")
+
+  const unnamed = await page.evaluate(() =>
+    [...document.querySelectorAll("#contact a")]
+      .filter((a) => (a.getAttribute("aria-label") ?? a.textContent ?? "").trim().length === 0)
+      .map((a) => a.getAttribute("href")),
+  )
+  ok(
+    unnamed.length === 0,
+    "every contact link has an accessible name" + (unnamed.length ? ": " + unnamed.join(", ") : ""),
+  )
+
+  /* §7 floor: 44x44 minimum on every target, footer socials included. */
+  const boxes = await page.evaluate(() =>
+    [...document.querySelectorAll("#contact a, footer a")].map((a) => {
+      const r = a.getBoundingClientRect()
+      return {
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        label: a.getAttribute("aria-label") ?? a.textContent?.trim(),
+      }
+    }),
+  )
+  const small = boxes.filter((b) => b.w < 44 || b.h < 44)
+  ok(
+    small.length === 0,
+    "every contact and footer target is at least 44x44" +
+      (small.length ? ": " + small.map((b) => b.label + " " + b.w + "x" + b.h).join(", ") : ""),
+  )
+
+  /*
+    cv.available is false, so no CV control may render. A download button
+    pointing at a 404 is worse than no button.
+  */
+  ok(
+    (await page.locator('a[href^="/cv/"]').count()) === 0,
+    "no CV control while cv.available is false",
+  )
+
+  await browser.close()
+}
+
+/* 15. M6 sections without JS — every fact must be in the SSR markup. */
+console.log("\n[experience · skills · contact · no javascript]")
+{
+  const browser = await chromium.launch()
+  const ctx = await browser.newContext({ javaScriptEnabled: false })
+  const page = await ctx.newPage()
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "load" })
+
+  const roles = await page.locator("#experience ol > li h3").allTextContents()
+  ok(roles.length > 0, "timeline entries render without JS (" + roles.length + ")")
+
+  /* Parent opacity, per the M2 trap — the hiding style sits on Reveal's wrapper. */
+  const hidden = await page.evaluate(() =>
+    [...document.querySelectorAll("#experience ol > li, #skills li, #contact a")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.textContent.trim().slice(0, 40)),
+  )
+  ok(
+    hidden.length === 0,
+    "M6 content is opaque without JS" + (hidden.length ? ": " + hidden.join(" | ") : ""),
+  )
+
+  ok((await page.locator("#skills li").count()) > 0, "skill chips render without JS")
+  ok((await page.locator("#contact a").count()) > 0, "contact links render without JS")
+  ok((await page.locator("footer a").count()) > 0, "footer socials render without JS")
+
+  await browser.close()
+}
+
+/* 16. M6 sections under reduced motion — §4.4. */
+console.log("\n[experience · skills · contact · reduced motion]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ reducedMotion: "reduce" })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+  await page.evaluate(() => document.getElementById("experience")?.scrollIntoView())
+  await page.waitForTimeout(600)
+
+  const faded = await page.evaluate(() =>
+    [...document.querySelectorAll("#experience ol > li, #skills li")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.textContent.trim().slice(0, 40)),
+  )
+  ok(
+    faded.length === 0,
+    "M6 content is opaque under reduced motion" + (faded.length ? ": " + faded.join(" | ") : ""),
+  )
+
+  /*
+    §4.4 makes "renders plainly" first-class: the rail is drawn in full and
+    static, not animated faster. Reading it at the TOP of the section is what
+    makes this mean something — the scroll-driven fill would still be near zero
+    there, so an unscaled transform can only be the static branch.
+  */
+  const fill = await page.evaluate(() => {
+    const ol = document.querySelector("#experience ol")
+    const el = ol?.parentElement?.querySelector('[aria-hidden="true"] > *')
+    return el ? getComputedStyle(el).transform : null
+  })
+  ok(
+    fill !== null && (fill === "none" || /^matrix\(1, 0, 0, 1,/.test(fill)),
+    "rail fill is unscaled (static, full height) under reduced motion: " + fill,
+  )
+
+  await browser.close()
+}
+
 console.log(
   fail.length === 0
     ? "\nAll persona assertions passed."

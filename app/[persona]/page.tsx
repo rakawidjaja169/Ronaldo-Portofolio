@@ -2,10 +2,15 @@ import { type ReactNode } from "react"
 import { type Metadata } from "next"
 import { notFound } from "next/navigation"
 
+import { ContactBlock } from "@/components/persona/contact-block"
 import { Hero } from "@/components/persona/hero"
 import { Section } from "@/components/persona/section"
+import { SkillGroups } from "@/components/persona/skill-groups"
+import { Timeline } from "@/components/persona/timeline"
 import { WorkGrid } from "@/components/persona/work-grid"
+import { getExperience } from "@/content/experience"
 import { BUILT_PERSONAS, getPersona, isPersonaCode } from "@/content/personas"
+import { getSkills } from "@/content/skills"
 import { getWork } from "@/content/work"
 
 /**
@@ -63,6 +68,9 @@ export default async function PersonaPage({ params }: { params: Promise<{ person
 
   const bodies: Record<string, ReactNode> = {
     work: <WorkGrid items={getWork(persona.code)} personaCode={persona.code} />,
+    experience: <Timeline entries={getExperience(persona.code)} />,
+    skills: <SkillGroups groups={getSkills(persona.code)} />,
+    contact: <ContactBlock />,
   }
 
   return (
@@ -71,8 +79,8 @@ export default async function PersonaPage({ params }: { params: Promise<{ person
 
       {/*
         Section landmarks and headings come from the persona; bodies come from
-        this map, keyed by the same id. M3 fills `work`; M4 and M6 add keys
-        without touching the nav, the hero, or Section itself. A section with no
+        this map, keyed by the same id. M3 filled `work` and M6 the other
+        three, neither touching the nav, the hero, or Section itself. A section with no
         entry here still renders its landmark and heading, which is what keeps
         the nav and the hero CTA addressing real anchors.
       */}

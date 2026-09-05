@@ -238,6 +238,11 @@ thing to remove, not another local run.
 
 ## M4 — Case studies
 
+> **Sequencing note.** M6 shipped before M4 and M5. M6's content already existed in
+> `content/_raw-experience.md`; M4's does not, and five of its six projects are still blocked
+> on the publication question M3 carried out. See the note at the top of M6. M4 and M5 now run
+> adjacent, which suits them — they share the MDX + zod pipeline.
+
 - MDX pipeline: `content/projects/swe/*.mdx`, zod-validated frontmatter, build fails on a
   malformed file.
 - `app/[persona]/work/[slug]/page.tsx` with `generateStaticParams`.
@@ -265,14 +270,79 @@ correctly.
 
 ---
 
-## M6 — Experience, skills, contact, footer
+## M6 — Experience, skills, contact, footer ✅
+
+**Taken ahead of M4 and M5, deliberately.** M6 was the only remaining milestone whose content
+already existed: `content/_raw-experience.md` held four jobs with real bullets and numbers, real
+education, and a concrete tech list, all recovered from `1ea7f90`. M4 needs long-form prose for
+six projects, five of which are the employer's internal tools still blocked on the publication
+question M3 carried out — it would have shipped six MDX files of lorem ipsum against a pipeline
+nobody could meaningfully review. The sequencing note at the bottom of this file permits the
+swap, and M4 and M5 now run adjacent, which suits them: they share the MDX + zod pipeline.
 
 - Timeline as `<ol>`, scroll-drawn rail, mono tabular years, entries animating in from the rail.
-- Skills grouped by category.
-- Contact block: email, LinkedIn, GitHub, WhatsApp, CV download. No form.
-- Persona footer: social links and auto year, no homepage link.
+- Skills grouped by category — four groups, text chips, no logos. Only twelve of the ~20 listed
+  skills had a logo file, so a logo wall presents an arbitrary subset as the whole list, and
+  "sprint planning" has no logo at all. The 12 unused logo files in `public/` are deleted; they
+  remain in git history at `1ea7f90`.
+- Contact block: email, LinkedIn, GitHub, WhatsApp. No form (§7). No CV control while
+  `cv.available` is false — a download button pointing at a 404 is worse than no button, the
+  same call M3 made for `hasCaseStudy`.
+- Persona footer: icon-only social links and auto year, no homepage link.
+- `content/experience.ts` and `content/skills.ts` follow M3's `getWork(code)` getter pattern
+  rather than growing the `Persona` type, so the registry stays a small readable index and a
+  persona with no timeline is an absent key, not an empty array to remember.
+- `whatsapp` is a **separate export** in `content/site.ts`, not a fourth entry in
+  `contactLinks`. That array is what the homepage renders (§4 gives it email, LinkedIn and
+  GitHub only); a shared array the persona filters is one wrong predicate away from putting a
+  personal phone number on the public homepage.
+- `components/ui/contact-link.tsx` extracted from `components/home/contact-links.tsx` now that
+  the persona block is its second consumer — the same rule M3 applied to the focus trap. It is
+  safe across the isolation boundary because it receives its href as data and has no link of
+  its own; the two *content-reading* components stay separate, which is where the leak risk
+  actually lives. `npm run test:e2e` is the regression gate on the extraction.
+- Education is one more entry in the timeline, not a section. One degree does not earn a
+  landmark, and `persona.sections` is what decides landmarks.
 
-**Done when:** `/swe` is content-complete end to end.
+**Done when:** `/swe` is content-complete end to end. ✅
+
+### Measured (local, `npm run build && npm start`, `/swe`)
+
+| Gate | Result |
+| --- | --- |
+| First Load JS | 167 kB — budget 200 kB (M3 was 163 kB; +4 kB is `useScroll`) |
+| `tests/persona.mjs` | 88 assertions, all pass |
+| `tests/homepage.mjs` | all pass — the `ContactLink` extraction is clean |
+| CLS | 0.018 — budget 0.05 |
+| Lighthouse mobile, 3 paired runs | Perf 90/87/86 vs homepage control 96/97/92 |
+| A11y · BP | 100 · 100 |
+| `npm run check:content` | still fails, and names nothing in the two new content modules |
+
+### Two bugs the new tests caught
+
+Both were found by assertions written to be falsifiable rather than to pass, and both are
+recorded because the shape of each will recur.
+
+- **The rail never drew.** `TimelineRail` was missing the `useMounted()` gate that
+  `components/ui/reveal.tsx` documents at length: Framer serializes the fill's starting
+  `scaleY(0)` into the SSR markup as an inline style, and when the reduced-motion branch then
+  renders a plain `<div>`, React updates the className and leaves that style attribute in
+  place. The rail was permanently collapsed — `matrix(1, 0, 0, 0, 0, 0)`. This is the third
+  component to hit the M2 trap. **Any client component with a non-motion fallback branch needs
+  the mount gate**, not just the ones in `reveal.tsx`.
+- **4px of horizontal scroll at 375px.** Timeline entries used `axis="left"`, which is a
+  *positive* 24px x-offset, so every entry sat past the right edge until it revealed. It was
+  also backwards: §4.3 asks for entries entering *from the rail*, which is `axis="right"`. The
+  `[overflow]` group caught it; nothing about the desktop view would have.
+
+### Carried out of M6
+
+- Real email, LinkedIn, GitHub and WhatsApp values for `content/site.ts`, and a current CV PDF
+  (the only one in git history is from 2021). `npm run check:content` names all 16 remaining
+  placeholders and blocks deploy.
+- **SEO reads 66 on `/swe` against 100 on the homepage.** This is `noindex` being scored as a
+  defect, which is §2.4 working exactly as specified. Recorded so a later reader does not
+  "fix" it.
 
 ---
 

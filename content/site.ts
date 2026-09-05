@@ -25,7 +25,7 @@ export type ContactLink = {
   /** Shown instead of the raw URL. Keeps mailto:/https:// out of the UI. */
   display: string
   href: string
-  icon: "mail" | "linkedin" | "github" | "file"
+  icon: "mail" | "linkedin" | "github" | "whatsapp" | "file"
   /** External links get rel/target; mailto and same-origin do not. */
   external?: boolean
 }
@@ -52,6 +52,23 @@ export const contactLinks: readonly ContactLink[] = [
     external: true,
   },
 ] as const
+
+/**
+ * WhatsApp — persona pages only (docs/product.md §5.1 lists it under Contact;
+ * §4 gives the homepage email, LinkedIn and GitHub only).
+ *
+ * A SEPARATE EXPORT, deliberately not a fourth entry in `contactLinks`. That
+ * array is what the homepage renders, so putting a personal phone number in it
+ * and filtering it back out on the homepage is one wrong predicate away from
+ * publishing it. Two named exports cannot make that mistake.
+ */
+export const whatsapp: ContactLink = {
+  label: "WhatsApp",
+  display: "wa.me/TODO", // TODO: real number, digits only, country code first
+  href: "https://wa.me/TODO",
+  icon: "whatsapp",
+  external: true,
+}
 
 /**
  * CV download. The only PDF in git history is from 2021 and is five years

@@ -19,6 +19,15 @@ The `_` prefix marks it as raw input, not shipped content.
 
 ## Experience
 
+**Consumed by `content/experience.ts` since M6.** The four jobs below were rewritten from
+résumé voice into portfolio voice there — every fact and number survives (8+ internal apps,
+40% faster page loads, a 3-person team, a 22% exam-score lift); the résumé scaffolding does
+not, because "aligning delivery with institutional priorities" asserts nothing a reader can
+check. This file stays the source of record for what was actually claimed.
+
+The tech list scattered through these entries is consumed by `content/skills.ts`, grouped
+into Languages / Frameworks and runtime / Data and infrastructure / Practices.
+
 ### Software Engineer & Project Lead
 **Yayasan Pendidikan Pelita Harapan — SDH Head Office** · March 2023 – Present
 
@@ -66,6 +75,9 @@ The `_` prefix marks it as raw input, not shipped content.
 ---
 
 ## Education
+
+**Consumed by `content/experience.ts` since M6**, as one more entry in the same timeline
+rather than its own section — one degree does not earn a landmark.
 
 **Bachelor of Computer Science** — Universitas Pelita Harapan (UPH) · 2018 – 2022
 
