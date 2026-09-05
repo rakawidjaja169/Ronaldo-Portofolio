@@ -1,9 +1,12 @@
+import { type ReactNode } from "react"
 import { type Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { Hero } from "@/components/persona/hero"
 import { Section } from "@/components/persona/section"
+import { WorkGrid } from "@/components/persona/work-grid"
 import { BUILT_PERSONAS, getPersona, isPersonaCode } from "@/content/personas"
+import { getWork } from "@/content/work"
 
 /**
  * Persona page — docs/product.md §5.1.
@@ -58,19 +61,25 @@ export default async function PersonaPage({ params }: { params: Promise<{ person
   const persona = getPersona(code)
   if (!persona) notFound()
 
+  const bodies: Record<string, ReactNode> = {
+    work: <WorkGrid items={getWork(persona.code)} personaCode={persona.code} />,
+  }
+
   return (
     <>
       <Hero persona={persona} />
 
       {/*
-        Section landmarks and headings ship now with empty bodies. The nav
-        scroll-spy and the hero CTA both address these ids, so they have to be
-        real from the first commit or those controls are decorative. Bodies
-        land in M3 (work), M4 (case studies), and M6 (experience, skills,
-        contact) without touching the nav or the hero.
+        Section landmarks and headings come from the persona; bodies come from
+        this map, keyed by the same id. M3 fills `work`; M4 and M6 add keys
+        without touching the nav, the hero, or Section itself. A section with no
+        entry here still renders its landmark and heading, which is what keeps
+        the nav and the hero CTA addressing real anchors.
       */}
       {persona.sections.map((section) => (
-        <Section key={section.id} id={section.id} heading={section.heading} />
+        <Section key={section.id} id={section.id} heading={section.heading}>
+          {bodies[section.id]}
+        </Section>
       ))}
     </>
   )

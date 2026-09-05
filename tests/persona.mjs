@@ -325,6 +325,234 @@ console.log("\n[overflow]")
   await browser.close()
 }
 
+/*
+  9. Work grid and lightbox — M3, design-system.md §6, §4.3, §7.
+
+  The empty-filter state is deliberately NOT asserted here. Tags are derived
+  from the items themselves, so every chip matches at least one card and the
+  empty branch is unreachable through the UI — it exists for a persona whose
+  work list is empty. Asserting it would need a fixture route that does not
+  exist. Recorded in docs/roadmap.md rather than faked with a test that drives
+  React state directly.
+*/
+console.log("\n[work grid]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+
+  const cards = page.locator("#work article")
+  const total = await cards.count()
+  ok(total > 0, "grid renders " + total + " cards")
+
+  const headings = await page.locator("#work article h3").allTextContents()
+  ok(
+    headings.length === total && headings.every((t) => t.trim().length > 0),
+    "every card has a non-empty title",
+  )
+
+  const triggers = page.locator('#work button[aria-label^="View screenshots of "]')
+  ok((await triggers.count()) === total, "every card has a labelled gallery trigger")
+
+  /*
+    Full keyboard path. Tab from the top rather than calling .focus() — a
+    trigger that is reachable programmatically but not by Tab passes the second
+    and fails the user.
+  */
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.locator("body").click({ position: { x: 2, y: 2 } })
+  let reached = false
+  for (let i = 0; i < 60 && !reached; i++) {
+    await page.keyboard.press("Tab")
+    reached = await page.evaluate(() =>
+      (document.activeElement?.getAttribute("aria-label") ?? "").startsWith(
+        "View screenshots of ",
+      ),
+    )
+  }
+  ok(reached, "a gallery trigger is reachable by Tab")
+
+  const triggerLabel = await page.evaluate(
+    () => document.activeElement?.getAttribute("aria-label") ?? "",
+  )
+
+  await page.keyboard.press("Enter")
+  const dialog = page.locator('[role="dialog"][aria-modal="true"]')
+  ok(await dialog.isVisible(), "Enter on the trigger opens the lightbox")
+  ok(
+    await page.evaluate(
+      () => document.activeElement?.closest('[role="dialog"]') !== null,
+    ),
+    "focus lands inside the dialog",
+  )
+  ok(
+    (await page.evaluate(() => getComputedStyle(document.body).overflow)) === "hidden",
+    "body scroll is locked while the lightbox is open",
+  )
+
+  /*
+    The counter only exists with more than one image, and only one project has
+    a real set. Skip the arrow assertions rather than assert nothing, so a
+    future single-image regression cannot hide behind a silent pass.
+  */
+  const counter = page.locator('[role="dialog"] p[aria-live="polite"]')
+  if ((await counter.count()) === 1) {
+    const before = (await counter.textContent())?.trim()
+    await page.keyboard.press("ArrowRight")
+    await page.waitForTimeout(120)
+    const afterNext = (await counter.textContent())?.trim()
+    ok(afterNext !== before, "ArrowRight advances the counter (" + before + " -> " + afterNext + ")")
+
+    await page.keyboard.press("ArrowLeft")
+    await page.waitForTimeout(120)
+    ok((await counter.textContent())?.trim() === before, "ArrowLeft returns to " + before)
+  } else {
+    ok(false, "opened gallery has no counter — expected a multi-image project first in the grid")
+  }
+
+  await page.keyboard.press("Escape")
+  await page.waitForTimeout(400)
+  ok((await dialog.count()) === 0, "Escape closes the lightbox")
+  ok(
+    (await page.evaluate(
+      () => document.activeElement?.getAttribute("aria-label") ?? "",
+    )) === triggerLabel,
+    "focus returns to the trigger that opened it",
+  )
+  ok(
+    (await page.evaluate(() => getComputedStyle(document.body).overflow)) !== "hidden",
+    "body scroll lock is released",
+  )
+
+  /* Scrim click closes. The scrim is the aria-hidden sibling, not the panel. */
+  await triggers.first().click()
+  ok(await dialog.isVisible(), "click opens the lightbox")
+  /* Top-left: the panel's own padding, clear of every child — see its onClick. */
+  await page.mouse.click(6, 6)
+  await page.waitForTimeout(400)
+  ok((await dialog.count()) === 0, "scrim click closes the lightbox")
+
+  /*
+    Filtering, with layout shift measured across the interaction — two
+    assertions, because one number cannot express the criterion.
+
+    Removing five of six cards shortens the grid, so everything below it moves
+    up. That is a large shift (measured 0.057) and it is not a defect: it is
+    the direct, expected result of a click, which is why the browser marks it
+    `hadRecentInput` and excludes it from CLS. Counting it would fail the
+    milestone for working correctly.
+
+    What the done-criterion actually forbids is a card's image box collapsing
+    or resizing mid-filter, which is what work-grid.tsx's docblock claims the
+    fixed `aspect-[16/10]` box prevents. So: real CLS (input-excluded, the
+    metric §8 budgets) stays under 0.05, AND the surviving card's image box is
+    the same height before and after. The second is what makes the first
+    falsifiable.
+
+    Deliberately NOT asserted: that nothing inside a card moves at all. Grid
+    rows equalise height, so a card that was stretched to match two siblings
+    returns to its natural height when it is alone — measured at 3px, absorbed
+    by the `flex-1` outcome line. That is the grid working, not a reflow.
+  */
+  await page.evaluate(() => {
+    window.__cls = 0
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (!entry.hadRecentInput) window.__cls += entry.value
+      }
+    }).observe({ type: "layout-shift", buffered: false })
+  })
+
+  const imageBoxHeight = () =>
+    page.evaluate(() => {
+      const box = document.querySelector("#work article div.relative")
+      return box ? Math.round(box.getBoundingClientRect().height) : -1
+    })
+  const boxBefore = await imageBoxHeight()
+
+  const chip = page.locator('#work button[aria-pressed]', { hasText: /^Payments$/i })
+  ok((await chip.count()) === 1, "the Payments filter chip exists")
+  await chip.click()
+  await page.waitForTimeout(700)
+
+  ok((await chip.getAttribute("aria-pressed")) === "true", "clicked chip is aria-pressed")
+  const filtered = await cards.count()
+  ok(filtered > 0 && filtered < total, "filter narrows " + total + " cards to " + filtered)
+
+  const cls = await page.evaluate(() => window.__cls)
+  ok(cls < 0.05, "CLS across the filter interaction is " + cls.toFixed(4) + " (budget 0.05)")
+
+  const boxAfter = await imageBoxHeight()
+  ok(
+    boxBefore > 0 && boxAfter === boxBefore,
+    "card image box holds its height through the filter (" + boxBefore + " -> " + boxAfter + ")",
+  )
+
+  const all = page.locator('#work button[aria-pressed]', { hasText: /^All$/i })
+  await all.click()
+  await page.waitForTimeout(500)
+  ok((await cards.count()) === total, "the All chip restores every card")
+
+  await browser.close()
+}
+
+/* 10. Work grid without JS — the cards are the section's whole content. */
+console.log("\n[work grid · no javascript]")
+{
+  const browser = await chromium.launch()
+  const ctx = await browser.newContext({ javaScriptEnabled: false })
+  const page = await ctx.newPage()
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "load" })
+
+  const cards = page.locator("#work article")
+  ok((await cards.count()) > 0, "cards render without JS (" + (await cards.count()) + ")")
+
+  /* Parent opacity, per the M2 trap — the hiding style sits on Reveal's wrapper. */
+  const hidden = await page.evaluate(() =>
+    [...document.querySelectorAll("#work article")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.querySelector("h3")?.textContent?.trim() ?? "?"),
+  )
+  ok(hidden.length === 0, "cards are opaque without JS" + (hidden.length ? ": " + hidden.join(", ") : ""))
+
+  ok(
+    (await page.locator('[role="dialog"]').count()) === 0,
+    "no lightbox markup ships with the document",
+  )
+
+  await browser.close()
+}
+
+/* 11. Work grid under reduced motion — §4.4, and the lightbox still works. */
+console.log("\n[work grid · reduced motion]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ reducedMotion: "reduce", viewport: { width: 1280, height: 900 } })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+  await page.evaluate(() => document.getElementById("work")?.scrollIntoView())
+  await page.waitForTimeout(600)
+
+  const faded = await page.evaluate(() =>
+    [...document.querySelectorAll("#work article")]
+      .filter((el) => getComputedStyle(el.parentElement).opacity !== "1")
+      .map((el) => el.querySelector("h3")?.textContent?.trim() ?? "?"),
+  )
+  ok(faded.length === 0, "cards are opaque under reduced motion" + (faded.length ? ": " + faded.join(", ") : ""))
+
+  await page.locator('#work button[aria-label^="View screenshots of "]').first().click()
+  const dialog = page.locator('[role="dialog"][aria-modal="true"]')
+  ok(await dialog.isVisible(), "lightbox opens under reduced motion")
+  ok(
+    await page.evaluate(() => document.activeElement?.closest('[role="dialog"]') !== null),
+    "focus is trapped under reduced motion",
+  )
+  await page.keyboard.press("Escape")
+  await page.waitForTimeout(300)
+  ok((await dialog.count()) === 0, "Escape still closes under reduced motion")
+
+  await browser.close()
+}
+
 console.log(
   fail.length === 0
     ? "\nAll persona assertions passed."

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Menu, X } from "lucide-react"
 
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useFocusTrap } from "@/lib/use-focus-trap"
 import { cn } from "@/lib/utils"
 
 type NavSection = { id: string; label: string }
@@ -95,45 +96,11 @@ export function PersonaNav({ sections }: { sections: readonly NavSection[] }) {
     Sheet: Esc closes, focus is trapped, body scroll is locked — §7, plus the
     §9 rule that a modal always has an escape route.
 
-    M3's lightbox needs the same trap. Extracting it is that milestone's job:
-    with one consumer the abstraction has nothing to generalize over.
+    The trap itself lives in lib/use-focus-trap.ts as of M3, when the lightbox
+    became its second consumer. Focus RETURN stays here, in `close`, because
+    this component owns the trigger.
   */
-  useEffect(() => {
-    if (!open) return
-
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        close()
-        return
-      }
-      if (e.key !== "Tab") return
-      const focusable = sheetRef.current?.querySelectorAll<HTMLElement>(
-        "a[href], button:not([disabled])",
-      )
-      if (!focusable || focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (!first || !last) return
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown)
-    sheetRef.current?.querySelector<HTMLElement>("a[href]")?.focus()
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown)
-      document.body.style.overflow = previousOverflow
-    }
-  }, [open, close])
+  useFocusTrap({ active: open, ref: sheetRef, onClose: close })
 
   const toTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" })

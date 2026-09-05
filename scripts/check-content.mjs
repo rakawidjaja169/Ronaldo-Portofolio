@@ -15,7 +15,13 @@ import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 
 const CONTENT_DIR = path.join(process.cwd(), "content")
-const PLACEHOLDER = /\bTODO\b/
+/*
+  TODO alone stopped being enough once M3 started shipping deliberate
+  placeholders: lorem-ipsum copy, `/placeholder.*` image paths, and
+  example.com links all sailed past the guard, which made "placeholders cannot
+  deploy" a claim rather than a property.
+*/
+const PLACEHOLDER = /\bTODO\b|lorem ipsum|\/placeholder[./]|example\.com/i
 
 /**
  * Skip comment lines. Prose explaining the placeholder convention is not

@@ -170,7 +170,7 @@ build, per the M1 note.
 
 ---
 
-## M3 — Work grid and lightbox
+## M3 — Work grid and lightbox ✅
 
 - `ProjectCard` per `design-system.md` §6 — card link and lightbox trigger are separate
   controls so the link is never hijacked.
@@ -178,9 +178,61 @@ build, per the M1 note.
 - Lightbox: focus trap, Esc, arrow-key navigation, scrim click, body scroll lock,
   shared-element open from the clicked thumbnail, adjacent-image preload.
 - Designed empty state for a filter that matches nothing.
+- `lib/use-focus-trap.ts` extracted from the nav, per the standing note there — the
+  lightbox is its second consumer. Focus *return* stays with each caller, which owns its
+  trigger ref. The `[mobile sheet]` test group is the regression gate on the extraction.
+- `scripts/prepare-work-images.mjs` — build-time WebP pipeline, committed output, no
+  runtime `sharp`. `public/` drops from ~13 MB to 629 KB; the 30 source PNGs remain in git
+  history at `c35dee3`.
+- `scripts/check-content.mjs` placeholder regex widened to `lorem ipsum`, `/placeholder.*`
+  and `example.com`. Authorizing placeholder copy while the guard grepped only `TODO`
+  would have made "placeholders cannot deploy" untrue.
 
 **Done when:** grid and lightbox are fully keyboard operable, CLS stays under 0.05 while
-filtering, axe reports zero violations on the section.
+filtering, axe reports zero violations on the section. ✅ — except axe, which M7 owns; this
+suite has no axe runner yet and adding one here duplicates work M7 is already scoped for.
+
+### Measured (local, `npm run build && npm start`, `/swe`)
+
+| Gate | Result |
+| --- | --- |
+| First Load JS | 163 kB — budget 200 kB (M2 was 143 kB; +20 kB is the grid and lightbox) |
+| `tests/persona.mjs` | 66 assertions, all pass |
+| CLS while filtering | 0.000 — budget 0.05 |
+| Card image box through filter | 229px → 229px, no reflow |
+| Lighthouse mobile, median of 5 | Perf 92 · A11y 100 · BP 100 |
+| LCP mobile | 2.7s — unchanged finding, see below |
+| `public/` total | 629 KB, down from ~13 MB |
+
+**Perf reads below the §8 floor of 95, and the local number cannot settle whether that is
+real.** Five paired runs, alternating the homepage and `/swe` on the same machine, gave home
+90/94/98/97/93 against swe 85/89/95/92/92 — an ~8-point swing per route between runs, which
+is wider than the ~2–3 point gap between the routes. What the pairing does establish is that
+the gap is small and is TBT, from hydrating the client grid: images cost 16ms and 7.4 KB
+(measured), and a build with the card images removed scored no better than one with them.
+Reveal is not the cost either — stripping it from the grid moved nothing (88 vs 87).
+
+**M8 decides this**, with M1's and M2's LCP findings and by the same measurement. The
+machine serving the site is also running the audit under 4× CPU throttling; that is the
+thing to remove, not another local run.
+
+### Carried out of M3
+
+- **Which internal apps may show public screenshots.** Five of six projects are an
+  employer's internal tools, so they render `_placeholder.webp` rather than real captures —
+  publishing those is the one action here an edit cannot take back once cached and scraped,
+  and `noindex` reduces that risk without removing it. Granting permission later is one
+  entry in `SETS` in `scripts/prepare-work-images.mjs` plus a re-run; no component changes.
+- **`hasCaseStudy` is `false` on every item**, so no card links anywhere. M4 owns the
+  case-study route and flips the flag; a card linking to a 404 is worse than one that does
+  not link yet.
+- **The empty-filter state is unasserted.** Tags are derived from the items, so every chip
+  matches at least one card and the empty branch is unreachable through the UI. It exists
+  for a persona with an empty work list, and testing it needs a fixture route that does not
+  exist. Recorded rather than faked with a test that drives React state directly.
+- Five `outcome` lines in `content/work.ts` are still `TODO`, with the `content/site.ts`
+  and `content/personas/swe.ts` placeholders. `npm run check:content` names all 14 and
+  blocks deploy.
 
 ---
 

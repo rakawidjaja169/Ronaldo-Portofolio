@@ -88,5 +88,13 @@ Only these were real work. The rest of the old `lib/data.ts` was v0.dev placehol
 Tech logos available: `laravel`, `vuejs`, `reactjs`, `nodejs`, `mysql`, `mongodb`, `redis`,
 `docker`, `php`, `codeigniter`, `sql-server`, `android`.
 
-**Still needed for M2:** timelines, one-line outcome per project, and a decision on which
-internal apps can be shown publicly.
+**Consumed by `content/work.ts` since M3.** The screenshot→project mapping in the table above
+is now the source of that file's six entries, and the PNGs it names have been deleted from
+`public/` — they live in git history at `c35dee3`, and `scripts/prepare-work-images.mjs`
+regenerates the WebP output from them. Only `online_admission_*` is cleared for publication
+and rendered; the five internal sets render `_placeholder.webp`.
+
+**Still open:** one-line outcome per project (five are `TODO` in `content/work.ts`), and the
+decision on which internal apps may be shown publicly. Both are tracked in
+`docs/roadmap.md` under "Carried out of M3"; granting publication later is one entry in
+`SETS` in the image script plus a re-run.
