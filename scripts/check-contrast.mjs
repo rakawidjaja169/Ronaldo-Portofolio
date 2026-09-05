@@ -70,6 +70,7 @@ const PAIRS = [
   { theme: "dark", fg: "accent", bg: "surface", min: 4.5 },
   { theme: "dark", fg: "accent-text", bg: "base", min: 4.5 },
   { theme: "dark", fg: "accent-text", bg: "surface", min: 4.5 },
+  { theme: "dark", fg: "on-accent", bg: "accent", min: 4.5 },
   { theme: "dark", fg: "border", bg: "base", min: 1.2 },
   { theme: "dark", fg: "ink-faint", bg: "base", info: true },
 
@@ -79,6 +80,7 @@ const PAIRS = [
   { theme: "light", fg: "ink-muted", bg: "surface", min: 4.5 },
   { theme: "light", fg: "accent-text", bg: "base", min: 4.5 },
   { theme: "light", fg: "accent-text", bg: "surface", min: 4.5 },
+  { theme: "light", fg: "on-accent", bg: "accent", min: 4.5 },
   { theme: "light", fg: "border", bg: "base", min: 1.05 },
   { theme: "light", fg: "ink-faint", bg: "base", info: true },
 

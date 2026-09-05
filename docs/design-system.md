@@ -231,6 +231,22 @@ The only WebGL on the site.
 
 ---
 
+### Status as of M2
+
+**What ships today is the poster, not the canvas.** `components/persona/backdrop-poster.tsx`
+is the CSS/SVG fallback described above — two `--accent-quiet` radial washes plus a baked
+feTurbulence grain. It is the required output in every skip case, so it is permanent, not
+temporary.
+
+The canvas is deferred to M9, pending M8's production LCP reading. Two consequences for
+anyone reading this section as spec:
+
+- **The ≤130 kB budget above is unverified.** No build has ever measured it; it is a
+  target set from first principles, and M9 is where it is either met or renegotiated.
+- **The skip-condition logic does not exist yet.** There is no `shouldMountBackdrop()` to
+  call. The poster renders unconditionally, which satisfies all four conditions trivially,
+  including `prefers-reduced-motion` — nothing in it animates, so there is no branch.
+
 ## 6. Components
 
 | Component | Notes |

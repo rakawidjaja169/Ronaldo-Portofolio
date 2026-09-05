@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 
 import { reveal, revealViewport, stagger } from "@/lib/motion"
@@ -32,6 +32,15 @@ type BaseProps = {
  * fold. Below it, hydration has finished and an IntersectionObserver is the
  * right tool, which is what this is for.
  *
+ * Nothing hidden is ever server-rendered. Framer serializes `initial` into
+ * the SSR markup as an inline `opacity:0`, and that style is what the browser
+ * paints when JS never arrives — or, as of M2, when reduced motion swaps in
+ * the plain branch and React leaves the server's style attribute in place.
+ * Either way the content is permanently invisible, which is a content bug, not
+ * a motion bug. So the first render is always the plain element, and the
+ * motion wrapper mounts in an effect. Below the fold this costs nothing
+ * visible: the element is off-screen when the swap happens.
+ *
  * The `prefers-reduced-motion` block in globals.css only neutralizes CSS
  * animations. Framer drives transforms through inline style, which walks past
  * that reset untouched, so the check has to happen here in JS.
@@ -39,6 +48,16 @@ type BaseProps = {
  * Under reduced motion the element renders plainly — not "animated faster",
  * not animated. §4.4 makes that a first-class path, not a degradation.
  */
+/**
+ * True only after hydration. Gates every motion wrapper below so the server
+ * never emits a hidden element — see the note above.
+ */
+function useMounted() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return mounted
+}
+
 export function Reveal({
   children,
   axis = "up",
@@ -47,10 +66,11 @@ export function Reveal({
   as = "div",
 }: BaseProps & { axis?: Axis; delay?: number }) {
   const reduced = useReducedMotion()
+  const mounted = useMounted()
   const Tag = as
   const MotionTag = motion[as]
 
-  if (reduced) {
+  if (reduced || !mounted) {
     return <Tag className={className}>{children}</Tag>
   }
 
@@ -79,10 +99,11 @@ export function RevealGroup({
   as = "div",
 }: BaseProps & { delayChildren?: number }) {
   const reduced = useReducedMotion()
+  const mounted = useMounted()
   const Tag = as
   const MotionTag = motion[as]
 
-  if (reduced) {
+  if (reduced || !mounted) {
     return <Tag className={className}>{children}</Tag>
   }
 
@@ -107,10 +128,11 @@ export function RevealItem({
   as = "div",
 }: BaseProps & { axis?: Axis }) {
   const reduced = useReducedMotion()
+  const mounted = useMounted()
   const Tag = as
   const MotionTag = motion[as]
 
-  if (reduced) {
+  if (reduced || !mounted) {
     return <Tag className={className}>{children}</Tag>
   }
 

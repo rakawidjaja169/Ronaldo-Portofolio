@@ -24,16 +24,31 @@ const PLACEHOLDER = /\bTODO\b/
  */
 const COMMENT = /^\s*(\/\/|\/\*|\*)/
 
-const files = (await readdir(CONTENT_DIR)).filter((f) => f.endsWith(".ts"))
+/**
+ * Recursive: content/ is nested (content/personas/swe.ts). A flat readdir
+ * silently skipped every persona file, so the guard passed while placeholders
+ * sat one directory down — the exact thing it exists to catch.
+ */
+async function collect(dir) {
+  const out = []
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...(await collect(full)))
+    else if (entry.name.endsWith(".ts")) out.push(full)
+  }
+  return out
+}
+
+const files = await collect(CONTENT_DIR)
 
 const findings = []
-for (const file of files) {
-  const full = path.join(CONTENT_DIR, file)
+for (const full of files) {
+  const rel = path.relative(process.cwd(), full).split(path.sep).join("/")
   const lines = (await readFile(full, "utf8")).split(/\r?\n/)
   lines.forEach((line, i) => {
     if (COMMENT.test(line)) return
     if (PLACEHOLDER.test(line)) {
-      findings.push({ file: path.posix.join("content", file), line: i + 1, text: line.trim() })
+      findings.push({ file: rel, line: i + 1, text: line.trim() })
     }
   })
 }

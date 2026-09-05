@@ -1,6 +1,6 @@
 # Roadmap — portfolio.rakawidjaja.com
 
-Nine milestones. Each is independently shippable and leaves the site in a deployable state.
+Ten milestones. Each is independently shippable and leaves the site in a deployable state.
 `swe` is the only persona built; the registry abstraction makes persona #2 a content-only
 change.
 
@@ -95,23 +95,78 @@ misses, it is fixed there, not deferred further.
 
 ---
 
-## M2 — Persona shell and hero
+## M2 — Persona shell and hero ✅
 
 The routing abstraction plus the site's most expensive component.
 
 - `content/personas.ts` registry, `Persona` type, `content/personas/swe.ts`.
 - `app/[persona]/layout.tsx` + `page.tsx`, `generateStaticParams` from the registry.
-- Unknown code → `notFound()`. Explicitly **not** a redirect to `/`.
+- Unknown code → `notFound()` via `dynamicParams = false`. Explicitly **not** a redirect.
 - Per-persona metadata with `robots: { index: false, follow: false }`.
-- Persona nav: sticky, scroll-condensing, anchor scroll-spy, mobile sheet. Logo scrolls to
-  top; it is not a link to `/`.
-- Hero section: mask-reveal headline, CTA.
-- WebGL backdrop: dynamic import, `ssr: false`, mounted post-paint, IntersectionObserver +
-  `visibilitychange` pause, dpr clamp, all four skip conditions from `design-system.md` §5,
-  static gradient poster fallback.
+- Persona nav: sticky, scroll-condensing (88→64 at 80px), anchor scroll-spy, mobile sheet.
+  Logo scrolls to top; it is not a link to `/`.
+- Hero section: mask-reveal headline, CTA anchoring `#work`.
+- Section shells — `<section id>` landmark + opener heading, empty body — for `work`,
+  `experience`, `skills`, `contact`. `sections` is content-level data on `Persona`, so the
+  nav, scroll-spy, and hero CTA all address real anchors from the first commit and M3/M4/M6
+  fill bodies without touching either.
+- `--on-accent` token (`#1f1f1f`, identical in both themes) for text on an `--accent` fill.
+  `--ink` inverts and the fill does not, so a button using it read 2.1:1 in light mode.
+  Both directions are now asserted in `scripts/check-contrast.mjs`.
+- `scripts/check-content.mjs` made recursive. It read only top-level `content/*.ts`, so
+  `content/personas/swe.ts` placeholders would have deployed past the guard.
+- `tests/persona.mjs` — the isolation test, written here per the sequencing note below.
+- **`components/ui/reveal.tsx` fixed:** all three wrappers now render plainly until an
+  effect confirms hydration. Framer serializes `initial` into the SSR markup as an inline
+  `opacity:0`, and React leaves that attribute in place when the plain branch renders — so
+  every section heading was permanently invisible with JS disabled AND under reduced motion.
+  The docblock had warned about exactly this for above-the-fold content; the missing half
+  was that the reduced-motion branch has the same problem at any scroll position. Below the
+  fold the hydration swap costs nothing visible: the element is off-screen when it happens.
 
-**Done when:** `/swe` renders statically, `/xyz` 404s, hero holds LCP < 2.0s on throttled
-mobile, `prefers-reduced-motion` renders the poster and never mounts the canvas.
+**Done when:** `/swe` renders statically, `/xyz` 404s, `prefers-reduced-motion` renders the
+poster and never mounts a canvas. ✅ — the LCP clause moves to M8 with M1's, see below.
+
+### WebGL deferred to post-M8
+
+M2 ships the CSS gradient + grain **poster** (`components/persona/backdrop-poster.tsx`),
+which `design-system.md` §5 already mandates as the required output in every skip case. It
+is the permanent fallback, not a stand-in.
+
+The canvas is deferred because M2's stated done-criterion was "hero holds LCP < 2.0s" and
+that budget is not yet settled: M1 misses it locally at 2.53s with zero WebGL, and M8 owns
+the authoritative production reading. Building the site's most expensive component against an
+unsettled budget risks paying for something we then rip out.
+
+Also deferred with it, deliberately: the `next/dynamic` seam, a `shouldMountBackdrop()`
+predicate for §5's four skip conditions, and the IntersectionObserver + `visibilitychange`
+pause. With no canvas to mount they have no consumer — untestable code that would be
+rewritten against the real component's needs anyway. The seam is one `next/dynamic` line the
+day the canvas exists.
+
+**Scheduled: after M8**, once production LCP is a real number to spend against. Carries
+§5's ≤130 kB and four skip conditions unchanged.
+
+### Measured (local, `npm run build && npm start`, `/swe`)
+
+| Gate | Result |
+| --- | --- |
+| First Load JS | 143 kB — budget 200 kB |
+| Lighthouse mobile (median of 5) | Perf 95 · A11y 100 · BP 100 · **SEO 63** |
+| LCP mobile | 2.6s — same as M1's 2.53s, no regression |
+| CLS | 0.000 — budget 0.05 |
+| `tests/persona.mjs` | 43 assertions, all pass |
+
+**SEO 63 is correct, not a defect.** The only failing audit is `is-crawlable` — "Page is
+blocked from indexing" — which is precisely what `product.md` §2.4 requires of a persona
+route. A persona page scoring 100 on SEO would mean the noindex had been dropped.
+
+The 35 kB over the homepage is Framer Motion, pulled in by `Reveal` in the section openers.
+M3's grid and M6's timeline both need it, so it is paid once here rather than deferred.
+
+**LCP is not a regression but is still over the 2.0s budget**, identically to M1 and for the
+same unresolved reason. Both readings are settled together in M8 against the deployed Vercel
+build, per the M1 note.
 
 ---
 
@@ -200,10 +255,29 @@ The milestone that makes the promises in `design-system.md` §7–8 enforceable 
 - Post-deploy Lighthouse run against production. **This is the authoritative reading of the
   §8 budgets** — the local M1 numbers were taken under 4× CPU throttling on a machine also
   serving the site. Settle the open M1 LCP finding here: if production LCP is under 2.0s,
-  record it and close the item; if it is not, fix it in this milestone.
+  record it and close the item; if it is not, fix it in this milestone. M2's `/swe` reading
+  (2.5s) is the same finding on a second route, and is settled by the same measurement.
 
 **Done when:** staging and production both serve the site, and a live `curl` confirms
 persona routes are `noindex` and absent from the sitemap.
+
+---
+
+## M9 — WebGL hero backdrop
+
+Deferred out of M2 (see that milestone for the full reasoning). Scheduled here rather than
+backlogged because it is committed work waiting on a number, not a maybe.
+
+- Unblocked by M8's production LCP reading. If production has no headroom under the §8
+  budget, the poster is final and this milestone closes as won't-do — that is a legitimate
+  outcome, not a failure.
+- `next/dynamic` with `ssr: false`, mounted post-paint, behind the poster.
+- All four skip conditions from `design-system.md` §5, plus IntersectionObserver and
+  `visibilitychange` pause and the dpr clamp.
+- Verify the ≤130 kB §5 budget, which no build has yet measured.
+
+**Done when:** the canvas mounts only where §5 permits, production LCP stays inside budget
+with it mounted, and `prefers-reduced-motion` still renders the poster alone.
 
 ---
 

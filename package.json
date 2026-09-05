@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:content": "node scripts/check-content.mjs",
-    "test:e2e": "node tests/homepage.mjs"
+    "test:e2e": "node tests/homepage.mjs",
+    "test:persona": "node tests/persona.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

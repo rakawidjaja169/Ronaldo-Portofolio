@@ -1,0 +1,333 @@
+/**
+ * Persona route verification — M2 acceptance, and the isolation test.
+ *
+ * docs/product.md §2 is the product's defining constraint, so it gets a test
+ * rather than a convention. Written now, while the routing abstraction is
+ * fresh, per the roadmap sequencing note; M7 folds it into the real suite with
+ * @playwright/test and axe.
+ *
+ * The assertions that matter most are 3 and 4: no anchor on /swe resolves to
+ * the homepage or to another persona, and no shipped client chunk names a
+ * reserved code. Everything else here is ordinary route acceptance.
+ *
+ *   npm run build && npm start
+ *   node tests/persona.mjs
+ */
+import { existsSync } from "node:fs"
+
+import { chromium } from "playwright"
+
+const ORIGIN = (process.env.BASE_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const BUILT = "swe"
+
+/**
+ * Reserved but unbuilt. These are what must never appear in served output —
+ * hardcoded rather than imported from content/personas.ts, because a test that
+ * reads the same source as the code under test cannot catch that source being
+ * wrong.
+ */
+const RESERVED = ["cst", "cc", "pm", "dsn"]
+
+/*
+  Stale-server guard — same fingerprint as tests/homepage.mjs, and for the same
+  reason: a stale `npm start` answers 200 while serving a .next that has been
+  overwritten, and every assertion below then reports on a page that no longer
+  exists. Asset existence is the fingerprint because the App Router emits no
+  build id into the HTML.
+*/
+{
+  const res = await fetch(ORIGIN + "/" + BUILT).catch(() => null)
+  if (!res?.ok) {
+    console.error("\nNo server at " + ORIGIN + " — run `npm run build && npm start` first.")
+    process.exit(1)
+  }
+  const assets = [...new Set((await res.text()).match(/\/_next\/static\/[^"']+/g) ?? [])]
+  /* decodeURIComponent: dynamic segments ship URL-encoded (%5Bpersona%5D),
+     and the on-disk path is the literal [persona]. Without this the guard
+     reports every persona chunk as missing and blocks on a fresh build. */
+  const missing = assets.filter(
+    (a) => !existsSync(decodeURIComponent(".next" + a.replace("/_next", "").split("?")[0])),
+  )
+  if (assets.length > 0 && missing.length > 0) {
+    console.error(
+      "\nStale server: " +
+        missing.length +
+        " of " +
+        assets.length +
+        " served assets are absent from .next — e.g. " +
+        missing[0] +
+        "\nKill the process on :3000 and restart `npm start`.",
+    )
+    process.exit(1)
+  }
+}
+
+const fail = []
+const ok = (c, m) => (c ? console.log("  PASS " + m) : (fail.push(m), console.log("  FAIL " + m)))
+
+/* 1. Routing — product.md §2.6. */
+console.log("\n[routing]")
+{
+  const built = await fetch(ORIGIN + "/" + BUILT, { redirect: "manual" })
+  ok(built.status === 200, "/" + BUILT + " returns 200")
+
+  /*
+    An unknown code must 404, NOT redirect. A redirect confirms that valid
+    codes exist and rewards probing, which is the one behavior the isolation
+    rule cannot afford. `redirect: "manual"` is what makes this meaningful —
+    the default would follow a 302 to / and report 200.
+  */
+  const unknown = await fetch(ORIGIN + "/xyz", { redirect: "manual" })
+  ok(unknown.status === 404, "/xyz returns 404, got " + unknown.status)
+  ok(
+    unknown.status < 300 || unknown.status >= 400,
+    "/xyz does not redirect (no Location header)",
+  )
+
+  for (const code of RESERVED) {
+    const res = await fetch(ORIGIN + "/" + code, { redirect: "manual" })
+    ok(res.status === 404, "/" + code + " (reserved, unbuilt) returns 404")
+  }
+}
+
+const html = await (await fetch(ORIGIN + "/" + BUILT)).text()
+
+/* 2. noindex — product.md §2.4. The entire search-engine exclusion. */
+console.log("\n[indexing]")
+{
+  const meta = html.match(/<meta name="robots" content="([^"]*)"/i)
+  ok(meta !== null, "/" + BUILT + " emits a robots meta tag")
+  ok(/noindex/i.test(meta?.[1] ?? ""), "robots meta contains noindex — got: " + meta?.[1])
+  ok(/nofollow/i.test(meta?.[1] ?? ""), "robots meta contains nofollow")
+
+  const robots = await (await fetch(ORIGIN + "/robots.txt")).text()
+  ok(!/Disallow:\s*\/\w/i.test(robots), "robots.txt has no persona Disallow (§2.4)")
+  ok(
+    ![BUILT, ...RESERVED].some((c) => new RegExp("/" + c + "\\b").test(robots)),
+    "robots.txt names no persona code",
+  )
+
+  const sitemap = await (await fetch(ORIGIN + "/sitemap.xml")).text()
+  ok(
+    ![BUILT, ...RESERVED].some((c) => new RegExp("/" + c + "\\b").test(sitemap)),
+    "sitemap.xml names no persona code",
+  )
+}
+
+/*
+  3. THE ISOLATION ASSERTION — product.md §2.1–2.3.
+
+  No anchor on a persona page may resolve to the homepage or to another
+  persona. Resolved against the origin rather than matched as a string, so a
+  relative href like "../" is caught the same as a literal "/".
+*/
+console.log("\n[isolation · links]")
+{
+  const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1])
+  ok(hrefs.length > 0, "found " + hrefs.length + " hrefs to check")
+
+  const pageUrl = ORIGIN + "/" + BUILT
+  const offending = []
+  for (const href of hrefs) {
+    if (/^(mailto:|tel:|#)/.test(href)) continue
+    let resolved
+    try {
+      resolved = new URL(href, pageUrl)
+    } catch {
+      continue
+    }
+    if (resolved.origin !== ORIGIN) continue // external, fine
+
+    const path = resolved.pathname.replace(/\/$/, "")
+    if (path === "") offending.push(href + " -> homepage")
+    const first = path.split("/")[1]
+    if (first && first !== BUILT && RESERVED.includes(first)) {
+      offending.push(href + " -> persona " + first)
+    }
+  }
+  ok(offending.length === 0, "no anchor resolves to / or another persona" + (offending.length ? ": " + offending.join(", ") : ""))
+}
+
+/*
+  4. THE ISOLATION ASSERTION, part two — the reserved codes must not reach the
+  browser at all.
+
+  content/personas.ts names every reserved code. Importing it from a client
+  component would inline that list into a chunk, publishing the enumeration in
+  a file anyone can read. This is why PersonaNav takes sections as props.
+*/
+console.log("\n[isolation · bundle]")
+{
+  const chunks = [...new Set(html.match(/\/_next\/static\/[^"']+\.js/g) ?? [])]
+  ok(chunks.length > 0, "found " + chunks.length + " client chunks to scan")
+
+  const leaked = []
+  for (const chunk of chunks) {
+    const body = await (await fetch(ORIGIN + chunk)).text()
+    for (const code of RESERVED) {
+      // Quoted, as it would appear in an inlined array of codes.
+      if (new RegExp('["\'`]' + code + '["\'`]').test(body)) leaked.push(code + " in " + chunk)
+    }
+  }
+  ok(leaked.length === 0, "no reserved code in any client chunk" + (leaked.length ? ": " + leaked.join(", ") : ""))
+}
+
+/* 5. Content renders without JS — product.md §9.6. */
+console.log("\n[no javascript]")
+{
+  const browser = await chromium.launch()
+  const ctx = await browser.newContext({ javaScriptEnabled: false })
+  const page = await ctx.newPage()
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "load" })
+
+  /*
+    Computed opacity, not DOM presence — the failure this guards against ships
+    every node in the HTML and still paints blank, because Framer serializes
+    `initial` into SSR markup as inline opacity:0.
+  */
+  const h1 = page.locator("h1")
+  ok((await h1.count()) === 1, "exactly one h1")
+  ok(await h1.isVisible(), "headline is visible")
+  ok((await h1.evaluate((el) => getComputedStyle(el).opacity)) === "1", "headline opacity is 1")
+
+  const cta = page.locator('main a[href^="#"]').first()
+  ok(await cta.isVisible(), "hero CTA is visible")
+
+  for (const id of ["work", "experience", "skills", "contact"]) {
+    ok((await page.locator("#" + id).count()) === 1, "section #" + id + " exists")
+  }
+
+  const navLinks = await page.locator('header nav a[href^="#"]').count()
+  ok(navLinks > 0, "nav anchors render without JS (" + navLinks + ")")
+
+  /*
+    Section headings, below the fold and wrapped in Reveal. This caught a real
+    M2 bug: Framer serializes `initial` into SSR markup as inline opacity:0, so
+    every heading shipped permanently invisible with JS off. Reading the h2's
+    own opacity would have missed it — the hiding style sits on Reveal's
+    wrapper, which is the h2's PARENT. Read the parent.
+  */
+  const hidden = await page.evaluate(() =>
+    [...document.querySelectorAll("main h2")]
+      .filter((h) => getComputedStyle(h.parentElement).opacity !== "1")
+      .map((h) => h.textContent.trim()),
+  )
+  ok(hidden.length === 0, "section headings are opaque without JS" + (hidden.length ? ": " + hidden.join(", ") : ""))
+
+  await browser.close()
+}
+
+/*
+  5b. Reduced motion — §4.4 makes "renders plainly" a first-class path, not a
+  degradation. Same wrapper-opacity trap as above: the plain branch must not
+  leave the server's hiding style behind.
+*/
+console.log()
+console.log("[reduced motion]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ reducedMotion: "reduce" })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await page.waitForTimeout(600)
+
+  const faded = await page.evaluate(() =>
+    [...document.querySelectorAll("main h2, main h1")]
+      .filter((h) => getComputedStyle(h.parentElement).opacity !== "1")
+      .map((h) => h.textContent.trim()),
+  )
+  ok(faded.length === 0, "all headings opaque under reduced motion" + (faded.length ? ": " + faded.join(", ") : ""))
+  ok((await page.locator("canvas").count()) === 0, "no canvas mounts (§5 — poster only)")
+
+  await browser.close()
+}
+
+/* 6. Keyboard and focus ring — design-system.md §7. */
+console.log("\n[keyboard]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage()
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+
+  await page.keyboard.press("Tab")
+  const first = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? "")
+  ok(first.startsWith("Skip to content"), "skip link is first — got: " + first)
+
+  await page.keyboard.press("Tab")
+  const second = await page.evaluate(() => ({
+    tag: document.activeElement?.tagName,
+    href: document.activeElement?.getAttribute("href"),
+  }))
+  /* The logo scrolls to top; it must not be a link to "/" — §2.1. */
+  ok(second.tag === "BUTTON", "logo is a button, not a link — got " + second.tag)
+  ok(second.href === null, "logo has no href")
+
+  /*
+    Settle past the 150ms transition before reading the ring: Tailwind's
+    transition-property list includes outline-color, so a sample at t=0 reads
+    currentColor and is indistinguishable from a missing accent ring.
+  */
+  await page.waitForTimeout(250)
+  const ring = await page.evaluate(() => {
+    const s = getComputedStyle(document.activeElement)
+    return { style: s.outlineStyle, width: s.outlineWidth, color: s.outlineColor }
+  })
+  ok(
+    ring.style === "solid" && parseFloat(ring.width) >= 2 && ring.color === "rgb(255, 145, 77)",
+    "focus ring is 2px solid accent — got " + JSON.stringify(ring),
+  )
+
+  await browser.close()
+}
+
+/* 7. Mobile sheet — §7 escape route, focus return, scroll lock. */
+console.log("\n[mobile sheet]")
+{
+  const browser = await chromium.launch()
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } })
+  await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+
+  const trigger = page.locator('button[aria-label="Open navigation menu"]')
+  ok(await trigger.isVisible(), "menu trigger visible at 375px")
+  ok((await trigger.getAttribute("aria-expanded")) === "false", "aria-expanded starts false")
+
+  await trigger.click()
+  const dialog = page.locator('[role="dialog"]')
+  ok(await dialog.isVisible(), "sheet opens")
+  ok(
+    (await page.evaluate(() => getComputedStyle(document.body).overflow)) === "hidden",
+    "body scroll is locked",
+  )
+
+  await page.keyboard.press("Escape")
+  ok(!(await dialog.isVisible()), "Escape closes the sheet")
+  ok(
+    await page.evaluate(
+      () => document.activeElement?.getAttribute("aria-label") === "Open navigation menu",
+    ),
+    "focus returns to the trigger",
+  )
+
+  await browser.close()
+}
+
+/* 8. No horizontal overflow — §7 (zoom to 200% without horizontal scroll). */
+console.log("\n[overflow]")
+{
+  const browser = await chromium.launch()
+  for (const width of [375, 768, 1440]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
+    const scrollW = await page.evaluate(() => document.documentElement.scrollWidth)
+    ok(scrollW <= width + 1, width + "px: no horizontal overflow (scrollWidth " + scrollW + ")")
+    await page.close()
+  }
+  await browser.close()
+}
+
+console.log(
+  fail.length === 0
+    ? "\nAll persona assertions passed."
+    : "\n" + fail.length + " assertion(s) failed:\n  " + fail.join("\n  "),
+)
+process.exit(fail.length === 0 ? 0 : 1)
