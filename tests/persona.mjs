@@ -39,7 +39,8 @@ const RESERVED = ["cst", "cc", "pm", "dsn"]
   reason: a stale `npx next start` answers 200 while serving a .next that has been
   overwritten, and every assertion below then reports on a page that no longer
   exists. Asset existence is the fingerprint because the App Router emits no
-  build id into the HTML.
+  build id into the HTML. The backslash in the character class is load-bearing
+  too — see the note on that line in tests/homepage.mjs.
 */
 {
   const res = await fetch(ORIGIN + "/" + BUILT).catch(() => null)
@@ -47,7 +48,7 @@ const RESERVED = ["cst", "cc", "pm", "dsn"]
     console.error("\nNo server at " + ORIGIN + " — run `npm run build && npx next start` first.")
     process.exit(1)
   }
-  const assets = [...new Set((await res.text()).match(/\/_next\/static\/[^"']+/g) ?? [])]
+  const assets = [...new Set((await res.text()).match(/\/_next\/static\/[^"'\\]+/g) ?? [])]
   /* decodeURIComponent: dynamic segments ship URL-encoded (%5Bpersona%5D),
      and the on-disk path is the literal [persona]. Without this the guard
      reports every persona chunk as missing and blocks on a fresh build. */
@@ -165,7 +166,7 @@ console.log("\n[isolation · links]")
 */
 console.log("\n[isolation · bundle]")
 {
-  const chunks = [...new Set(html.match(/\/_next\/static\/[^"']+\.js/g) ?? [])]
+  const chunks = [...new Set(html.match(/\/_next\/static\/[^"'\\]+\.js/g) ?? [])]
   ok(chunks.length > 0, "found " + chunks.length + " client chunks to scan")
 
   const leaked = []
@@ -1141,7 +1142,7 @@ console.log("\n[case study · overflow]")
 /* 24. The case-study client chunks must not carry the enumeration either. */
 console.log("\n[case study · bundle]")
 {
-  const chunks = [...new Set(studyHtml.match(/\/_next\/static\/[^"']+\.js/g) ?? [])]
+  const chunks = [...new Set(studyHtml.match(/\/_next\/static\/[^"'\\]+\.js/g) ?? [])]
   ok(chunks.length > 0, "found " + chunks.length + " client chunks to scan")
 
   const leaked = []
@@ -1527,8 +1528,8 @@ console.log("\n[blog · bundle]")
 {
   const chunks = [
     ...new Set([
-      ...(blogHtml.match(/\/_next\/static\/[^"']+\.js/g) ?? []),
-      ...(postHtml.match(/\/_next\/static\/[^"']+\.js/g) ?? []),
+      ...(blogHtml.match(/\/_next\/static\/[^"'\\]+\.js/g) ?? []),
+      ...(postHtml.match(/\/_next\/static\/[^"'\\]+\.js/g) ?? []),
     ]),
   ]
   ok(chunks.length > 0, "found " + chunks.length + " client chunks to scan")

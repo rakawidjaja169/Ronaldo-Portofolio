@@ -39,6 +39,15 @@ const ACCENT_RGB = "rgb(255, 145, 77)"
   reports on a page that no longer exists. This has cost two debugging
   detours.
 
+  THE CHARACTER CLASS EXCLUDES A BACKSLASH, AND THAT IS THE WHOLE FIX.
+  The RSC flight payload embeds the same asset URLs a second time inside a
+  JSON string, so the source text contains \" as the closing delimiter.
+  Without \ in the class the match runs one character too far and yields
+  ".../x.woff2\", which existsSync on Windows resolves anyway (a trailing
+  separator is tolerated) and on Linux does not. The guard therefore passed
+  locally for six milestones and failed the first CI run it was ever part of,
+  reporting "4 of 17 assets absent" against a build that was entirely present.
+
   Fingerprint is asset existence, not a build id: the App Router does not
   emit one into the HTML, but a stale server references hashed chunks that
   are no longer on disk, which is exactly the condition worth failing on.
@@ -49,7 +58,7 @@ const ACCENT_RGB = "rgb(255, 145, 77)"
     console.error("\nNo server at " + URL + " — run `npm run build && npx next start` first.")
     process.exit(1)
   }
-  const assets = [...new Set((await res.text()).match(/\/_next\/static\/[^"']+/g) ?? [])]
+  const assets = [...new Set((await res.text()).match(/\/_next\/static\/[^"'\\]+/g) ?? [])]
   const missing = []
   for (const a of assets) {
     const onDisk = ".next" + a.replace("/_next", "").split("?")[0]
