@@ -42,7 +42,7 @@ it.
 1. **Import the repo.** Vercel → Add New → Project → import `Ronaldo-Portofolio`.
 2. **Framework preset:** Next.js. Build command, output directory and install command
    are all correct by default — leave them.
-3. **Node version:** 22. `package.json` declares `engines.node: ">=22"` and `.nvmrc`
+3. **Node version:** 22. `package.json` declares `engines.node: "22.x"` and `.nvmrc`
    says `22`; confirm the project setting agrees rather than trusting the platform
    default, which moves.
 4. **Environment variables: none.** Adding `NEXT_PUBLIC_SITE_URL` is harmless if it

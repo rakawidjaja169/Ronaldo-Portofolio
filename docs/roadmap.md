@@ -653,7 +653,8 @@ something this repo can do to itself.
 - `.dockerignore` — `.next` and `.env*` are correctness entries, not size ones. Without
   the first, this machine's build ships in the context and can shadow the builder's.
 - `.env.example`, now actually tracked — see trap 1 below.
-- `.nvmrc` (`22`) and `engines.node: ">=22"`. Before this the only Node pin in the repo was
+- `.nvmrc` (`22`) and `engines.node: "22.x"`. Vercel rejects bare comparator ranges here,
+  so the pin is a Vercel-shaped one. Before this the only Node pin in the repo was
   `ci.yml`; Vercel and the Docker base image each chose their own.
 - Security headers in `next.config.mjs` — HSTS, nosniff, Referrer-Policy, X-Frame-Options,
   Permissions-Policy, CSP, and `poweredByHeader: false`. `headers()` is honoured by both the
