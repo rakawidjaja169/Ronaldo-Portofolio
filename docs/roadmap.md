@@ -732,6 +732,31 @@ email address and production.
   first production deploy — if it holds ≥ 95, record that and close the M1 (2.53s) and M2
   (2.5s) LCP findings; if it does not, fix it before calling this milestone done.
 
+### Staging is live and green
+
+`http://portfolio-web.192.168.0.22.sslip.io`, Dokploy, Docker build type. All three suites
+pass against it: `test:persona`, `test:e2e`, `check:a11y` (14 route/theme pairs, no critical
+or serious violations).
+
+Two assertions ran for the first time here, both written in this milestone and both skipped
+on localhost by design:
+
+- **The robots.txt pairing check.** Staging serves `Disallow: /`; production would serve
+  `Allow: /` plus its `Sitemap:` line. Asserted as a pairing because each half alone passes
+  on the wrong host. It is also the only proof the Dokploy build ARG actually took — an image
+  built without it reports itself as production.
+- **The `[headers]` group against a non-localhost origin.** All six headers present, CSP
+  complete including the `script-src` whose absence broke the page earlier in this milestone.
+
+`sitemap.xml` reads `<loc>http://portfolio-web.192.168.0.22.sslip.io</loc>` — the staging
+origin, not the production fallback. That is the build ARG, confirmed from the served bytes.
+
+**One trap cost an hour and is now in `docs/deploy.md` §3.** `sslip.io` encodes the IP in the
+hostname, and Dokploy pre-filled a wrong one. A hostname pointing at any other machine that
+answers port 80 fails as `curl: (52) Empty reply from server` — indistinguishable from a
+crashed container, and it survives a rebuild, so it reads as an app fault. The container was
+healthy and serving the whole time; only the name was wrong.
+
 **Done when:** staging and production both serve the site, and
 `BASE_URL=<origin> npm run test:persona` passes against the live origin — which asserts the
 `noindex`, the null canonical, the absence of persona paths from `sitemap.xml`, the absence

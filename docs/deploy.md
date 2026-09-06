@@ -96,6 +96,11 @@ it.
    A **build argument**, not an environment variable. Dokploy's UI has separate fields
    for the two; putting it in the wrong one produces an image that builds cleanly and
    serves production URLs.
+
+   In Dokploy the field is **Environment tab -> Build Time Arguments** — not the Build tab,
+   and not the regular Environment Variables box directly above it. It only appears once
+   build type is Dockerfile. Regular env vars are never passed as `--build-arg`; they reach
+   the final image only, which is too late for a `NEXT_PUBLIC_` value.
 4. **Port:** `3000`. The container listens on `0.0.0.0:3000` (`ENV HOSTNAME=0.0.0.0` in
    the runner stage — without it Next binds localhost inside the container and the proxy
    gets connection-refused).
@@ -105,6 +110,34 @@ it.
 6. **Deploy**, then run §4 against the staging origin.
 
 Rebuilding staging is required whenever the staging origin changes, because of §1.
+
+### The staging hostname must name the machine Traefik runs on
+
+`sslip.io` encodes the IP **in the hostname**: `foo.192.168.0.22.sslip.io` resolves to
+`192.168.0.22`, always, with no record to configure. That is the appeal, and it is also the
+trap — Dokploy pre-fills the domain field with its own guess at the server's address, and
+that guess is wrong on any box behind NAT or with more than one interface.
+
+Point it at the host serving Traefik. Confirm which one that is before trusting the
+pre-filled value:
+
+```sh
+curl -sS -o /dev/null -w '%{http_code}\n' http://<ip>/   # Traefik: 404 for an unknown Host
+curl -sSI http://<ip>/ | grep -i '^server:'                    # anything else: not Traefik
+```
+
+**A wrong IP fails as `curl: (52) Empty reply from server`** — the connection is accepted and
+closed with no bytes, because something else on the network answers port 80 and has no route
+for the name. That is indistinguishable from a crashed container, and it survives a rebuild,
+so it reads as an app fault. It is not. Check the hostname's IP against Traefik's host first;
+`docker logs` showing `✓ Ready` while every request returns 52 is the signature.
+
+Two related notes, neither of them a fault:
+
+- **`OCI runtime exec failed: "bash": executable file not found`** in the panel's terminal or
+  log viewer is `node:22-alpine` shipping `ash`, not `bash`. The panel, not the app.
+- **HSTS over plain HTTP** is inert — browsers ignore `Strict-Transport-Security` on a
+  non-secure connection. `next.config.mjs` sends it unconditionally; leave it.
 
 ---
 
