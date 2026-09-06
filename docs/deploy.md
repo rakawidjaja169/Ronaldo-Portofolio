@@ -158,15 +158,15 @@ true. Every option for fixing Dokploy is really an answer to *how does an event 
 public internet reach a machine with no public address* — and it would be identical for
 Coolify, CapRover, or a bare compose box. Self-hosting buys control and costs reachability.
 
-Three things must line up. Only the third is difficult.
+Two things must line up. Only the second is difficult.
 
-1. **Content type `application/json`.** Not `x-www-form-urlencoded`. Dokploy reads `ref` and
-   `repository.full_name` out of the JSON body; form-encoding hands it a single `payload=`
-   string it never parses.
-2. **The branch must match exactly.** Dokploy compares the payload's `ref` against
-   `refs/heads/<its configured branch>` and answers `{"message":"Branch Not Match"}` on any
-   difference. App -> General -> Branch, and the branch you actually push, are the two values.
-3. **GitHub must be able to reach the panel**, and by default it cannot.
+1. **The app's Git settings must match the push**, exactly. See the route's step 7 below —
+   it is an all-columns-equal database query, and every column already matches.
+2. **GitHub must be able to reach the panel**, and by default it cannot.
+
+The content-type and `Branch Not Match` traps documented here earlier belong to the
+**bare-token** endpoint, `/api/deploy/<refreshToken>`. That is not the endpoint in use — see
+below — and neither trap applies to the one that is.
 
 #### The DNS finding that looks like a bug and is not
 
@@ -183,13 +183,53 @@ Two consequences worth writing down, because both cost time once:
   pre-dates this project, unchanged here — but it is also why every webhook delivery failed
   at the connection regardless of content type or branch.
 
+#### Use `/api/deploy/github`, not the token URL
+
+Dokploy exposes three deploy routes. Two authenticate with nothing but a secret in the URL.
+The third verifies a signature:
+
+| | `/api/deploy/<refreshToken>` | `/api/deploy/github` |
+| --- | --- | --- |
+| Auth | Knowledge of the URL | HMAC-SHA256 over the request body |
+| The URL in a proxy log | Anyone who reads it can trigger a rebuild | Worthless without the secret |
+| Apps covered | One — a token per app | Every app under the GitHub App, matched by repo + branch |
+| Requires | Nothing | A GitHub App with a webhook secret |
+
+The second is what this repo uses. **A GitHub App is already installed** —
+`dokploy-homeserver-vm`, installation `158221291` — with a webhook secret stored, and both
+`Ronaldo-Portofolio` and `Memora` are wired to it. One hostname serves both; there is no
+per-repo webhook to create and no second tunnel to run.
+
+**What the route does, in order.** Read off the compiled bundle
+(`/app/.next/server/pages/api/deploy/github.js` inside the `dokploy` container), because
+knowing the order is what makes a failure diagnosable:
+
+| # | Check | Failure |
+| --- | --- | --- |
+| 1 | `x-hub-signature-256` header present | `401 Missing signature header` |
+| 2 | `body.installation.id` matches a row in the `github` table | `400 Github Installation not found` |
+| 3 | HMAC verify body against that row's `githubWebhookSecret` | `401 Unauthorized` |
+| 4 | `x-github-event: ping` | `200 Ping received, webhook is active` — short-circuits |
+| 5 | Event is `push` or `pull_request` | `400 We only accept push events...` |
+| 6 | Commit message has no `[skip ci]` / `[ci skip]` / `[no ci]` / `[skip actions]` | `200`, skipped, no build |
+| 7 | Find apps where **all** of: `sourceType='github'`, `autoDeploy`, `triggerType='push'`, `branch`, `repository`, `owner`, `githubId` | No match: `200`, and nothing happens |
+
+Step 7 is silent when it misses — a green 200 in GitHub with no deployment in Dokploy means
+step 7, every time. `owner` comes from `repository.owner.name ?? repository.owner.login`, and
+`branch` is the ref with `refs/heads/` stripped. Read the row and compare all seven:
+
+```sh
+docker exec $(docker ps -qf name=dokploy-postgres) psql -U dokploy -d dokploy \
+  -c 'select "appName","sourceType","triggerType","autoDeploy","branch","repository","owner","githubId" from application;'
+```
+
 #### The fix: a Cloudflare Tunnel, gated by Access
 
 Outbound-only. `cloudflared` dials out and Cloudflare routes back down that connection — no
 port forwarding, no public IP, no inbound firewall rule.
 
-Expose a deploy endpoint, not the panel. One hostname reaching the Dokploy container is
-enough for the webhook, and it keeps the dashboard off the public internet.
+Expose the deploy endpoint, not the panel. One hostname reaching the Dokploy container is
+enough, and it keeps the dashboard off the public internet.
 
 **The connector is already running** on vm202 as `cloudflared-portfolio`, matching the house
 pattern used by `cloudflared-memora`, `cloudflared-9router` and the Vaultwarden tunnel — one
@@ -206,6 +246,10 @@ Four `Registered tunnel connection` lines (connIndex 0-3) is a healthy connector
 on the default bridge cannot, and needs `--add-host=host.docker.internal:host-gateway` plus
 `host.docker.internal:3000` instead. That works, but it is off-pattern — prefer the network.
 
+**A healthy connector routes nothing on its own.** The tunnel and its ingress rules are
+separate objects: four registered connections alongside a hostname that still resolves to the
+wildcard is the normal state of a tunnel with no public hostname yet, not a broken one.
+
 `cloudflared-memora` on the same host is a different tunnel for a different project. Leave it.
 
 **In Cloudflare** (Zero Trust -> Networks -> Tunnels), add a public hostname:
@@ -214,46 +258,58 @@ on the default bridge cannot, and needs `--add-host=host.docker.internal:host-ga
 | --- | --- |
 | Subdomain | `deploy` |
 | Domain | `rakawidjaja.com` |
+| Path | *(empty)* |
 | Service type | `HTTP` |
 | URL | `dokploy:3000` |
 
-SSL/TLS mode: **Full**. Not Flexible — it produces redirect loops against Traefik.
+`dokploy:3000` is the container name resolved over `dokploy-network`, not an address.
 
-**Then gate it** (Zero Trust -> Access -> Applications). Access cannot authenticate GitHub —
-a webhook cannot complete an email OTP — so the deploy path is unavoidably open, and the
-policy order is what contains it:
+SSL/TLS mode: **Full**. Not Flexible — it produces redirect loops against Traefik. Not Strict
+either: the origin hop is plain HTTP inside Docker by design, and Cloudflare terminates TLS at
+the edge.
 
-| Order | Path | Policy |
-| --- | --- | --- |
-| 1 | `/api/deploy/*` | **Bypass** — Everyone |
-| 2 | `/*` | **Allow** — your email, one-time PIN |
+**Then gate it** (Zero Trust -> Access -> Applications, self-hosted, `deploy.rakawidjaja.com`).
+Access cannot authenticate GitHub — a webhook cannot complete an email OTP — so one path must
+stay open, and the policy order is what contains it:
 
-Everything except the token-guarded deploy endpoint is behind OTP. A leaked deploy token then
-buys an attacker exactly one thing: triggering a staging rebuild of a public repo. Rotate it
-from the Dokploy app's webhook URL; it is the only credential guarding that path.
+| Order | Path | Action | Rule |
+| --- | --- | --- | --- |
+| 1 | `/api/deploy/github` | **Bypass** | Everyone |
+| 2 | `/*` | **Allow** | Your email, one-time PIN |
+
+That exact path, not a wildcard over `/api/deploy/*` — the token routes stay behind OTP with
+everything else. Policies evaluate top-down and first match wins, so Bypass second means the
+webhook meets the login page and GitHub records a redirect instead of a 200.
+
+What is left exposed is an endpoint that rejects anything without a valid HMAC. No deploy
+token guards this path, so there is nothing on it to rotate.
+
+**In GitHub**: the App's webhook URL, at
+`github.com/settings/apps/dokploy-homeserver-vm` -> General -> Webhook URL, must be
+`https://deploy.rakawidjaja.com/api/deploy/github`. That one field is the whole change; the
+App already sends push events for every repo it is installed on.
 
 **In the app being deployed:** General -> Auto Deploy on, branch set to the branch you push.
 
-**In GitHub** (Settings -> Webhooks -> Add webhook):
-
-| Field | Value |
-| --- | --- |
-| Payload URL | `https://deploy.rakawidjaja.com/api/deploy/<the app's deploy token>` |
-| Content type | `application/json` |
-| SSL verification | Enabled |
-| Events | Just the push event |
-
-**Verify** without waiting for a push:
+**Verify** without waiting for a push. From **outside the LAN** — a phone on cellular, not the
+house network, or the wildcard answers instead of Cloudflare:
 
 ```sh
-curl -sS -X POST https://deploy.rakawidjaja.com/api/deploy/<token> \
-  -H 'Content-Type: application/json' -H 'X-GitHub-Event: push' \
-  -d '{"ref":"refs/heads/<branch>","repository":{"full_name":"<owner>/<repo>"}}'
-# {"message":"Application deployed successfully"}
+curl -sS -o /dev/null -w '%{http_code}\n' https://deploy.rakawidjaja.com/api/deploy/github
 ```
 
-Then push, and read GitHub's Recent Deliveries tab. A green 200 is the whole contract; a red
-timeout means the tunnel is not up, and `Branch Not Match` means item 2 above.
+| Code | Meaning |
+| --- | --- |
+| `401` | **Correct.** Tunnel up, Access bypass working, route rejecting an unsigned request |
+| `302` | Access policy order is wrong — OTP is catching the deploy path |
+| `530` | Tunnel down, or no public hostname matches this name |
+
+**A 401 here is the success signal, not a failure** — the single most misreadable response in
+this setup.
+
+Then use the App's own delivery log (App -> Advanced -> Recent Deliveries) and Redeliver the
+most recent push, or push a commit. A green 200 carrying `App Deployed` is the contract.
+`Unauthorized` is a secret mismatch; a 200 with no build in Dokploy is step 7 above.
 
 #### Reaching vm202
 
