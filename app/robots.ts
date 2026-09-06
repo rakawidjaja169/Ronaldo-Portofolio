@@ -17,8 +17,22 @@ import { env } from "@/lib/env"
  *
  * The per-page `robots: { index: false, follow: false }` on persona routes
  * (M2) does the whole job and leaks nothing. Do not add Disallow rules here.
+ *
+ * THE STAGING BRANCH BELOW IS THE ONE EXCEPTION, AND IT IS NOT A CONTRADICTION.
+ * Everything above is about persona paths on the production origin, where
+ * naming a code publishes the enumeration and Disallow would suppress the
+ * noindex that does the real work. A staging origin has neither problem: the
+ * blanket `Disallow: /` names nothing, and there is no indexing to preserve —
+ * the whole point is that no part of staging should be crawled. Without it a
+ * staging deploy publishes a crawlable duplicate of the homepage, which is
+ * production's only indexable page, and the two compete for the same content.
+ * Persona routes were never at risk either way; their noindex is per-page.
  */
 export default function robots(): MetadataRoute.Robots {
+  if (!env.isProduction) {
+    return { rules: { userAgent: "*", disallow: "/" } }
+  }
+
   return {
     rules: {
       userAgent: "*",

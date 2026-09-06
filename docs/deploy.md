@@ -31,6 +31,21 @@ absent, which makes the failure quiet:
 So Vercel needs no environment variable at all, and **staging must pass the value as a
 Docker build argument** — not as a runtime env var. See §3.
 
+The build now refuses rather than guessing: an `ARG` with no `--build-arg` expands to an
+empty string, which is not nullish and so defeats the fallback instead of triggering it.
+The Dockerfile checks for that before `npm run build` and stops in under a second with the
+variable named. Without the check it failed forty seconds in, inside page-data collection,
+as `ERR_INVALID_URL` with no mention of which variable was empty.
+
+**A second consequence: staging is not crawlable.** `lib/env.ts` derives `isProduction`
+from this same value — not from `NODE_ENV`, which cannot tell the two apart because
+staging is a production build in every sense `NODE_ENV` means. `app/robots.ts` reads it and
+serves a blanket `Disallow: /` on any non-production origin. Persona routes were never at
+risk (their `noindex` is per-page), but the homepage is `Allow: /`, so without this a
+staging deploy publishes a crawlable duplicate of production's only indexable page.
+Verified by building both flavours: the staging image serves `Disallow: /`, the production
+one serves `Allow: /` plus its `Sitemap:` line.
+
 ---
 
 ## 2. Production — Vercel

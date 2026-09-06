@@ -43,6 +43,20 @@ COPY . .
 ARG NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 
+# Refuse the build rather than produce a wrong image. An ARG with no
+# --build-arg expands to "", which is not nullish, so it defeats the fallback
+# in lib/env.ts rather than triggering it — the first version of this file
+# failed 40 seconds into `next build` with `ERR_INVALID_URL` and no mention of
+# which variable was empty. Fail here instead, by name, in under a second.
+RUN test -n "$NEXT_PUBLIC_SITE_URL" || ( \
+      echo "" && \
+      echo "NEXT_PUBLIC_SITE_URL is empty." && \
+      echo "Pass it as a BUILD ARG, not a runtime env — it is inlined at build time:" && \
+      echo "  docker build --build-arg NEXT_PUBLIC_SITE_URL=https://<origin> ." && \
+      echo "See docs/deploy.md section 1." && \
+      echo "" && \
+      exit 1 )
+
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

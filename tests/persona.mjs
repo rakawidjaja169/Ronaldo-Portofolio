@@ -142,6 +142,24 @@ console.log("\n[indexing]")
     ![BUILT, ...RESERVED].some((c) => new RegExp("/" + c + "\\b").test(sitemap)),
     "sitemap.xml names no persona code",
   )
+
+  /*
+    Staging must be crawlable by nobody; production must be crawlable at "/".
+    Asserted as a PAIRING against the origin under test, because each half
+    alone passes on the wrong host: a blanket `Disallow: /` looks correct on
+    production too, and `Allow: /` looks correct on staging. env.isProduction
+    is derived from NEXT_PUBLIC_SITE_URL, so this is also the only check that
+    the Dokploy build argument actually took — an image built without it
+    reports itself as production here (see docs/deploy.md §1).
+  */
+  const blanketDisallow = /Disallow:\s*\/\s*$/im.test(robots)
+  if (ORIGIN === "https://portfolio.rakawidjaja.com") {
+    ok(!blanketDisallow, "production robots.txt does not blanket-Disallow")
+    ok(/Allow:\s*\//i.test(robots), "production robots.txt allows /")
+    ok(robots.includes("Sitemap:"), "production robots.txt names its sitemap")
+  } else if (!ORIGIN.startsWith("http://localhost")) {
+    ok(blanketDisallow, "a non-production origin blanket-Disallows — got: " + robots.trim())
+  }
 }
 
 /*
