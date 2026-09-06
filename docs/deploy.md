@@ -139,89 +139,98 @@ Two related notes, neither of them a fault:
 - **HSTS over plain HTTP** is inert — browsers ignore `Strict-Transport-Security` on a
   non-secure connection. `next.config.mjs` sends it unconditionally; leave it.
 
-
 ### Auto-deploy on push
 
 Dokploy does not poll. It waits for a POST from GitHub, and until 2026-09-06 nothing was
-sending one — the repo had no webhook at all, and the last two commits were on `staging`
-while the app was configured for `main`.
+sending one.
 
-Three things have to line up. Only the third is difficult.
+**Why this is hard here and trivial on Vercel.** The difference is not that Dokploy is worse
+designed. It is which side opens the connection:
+
+| | Vercel | Dokploy |
+| --- | --- | --- |
+| Where it runs | Vercel's public cloud | A VM on the LAN, `192.168.0.22` |
+| Public inbound address | Permanent, theirs | **None.** Double-NAT (Fiber -> ZTE -> TP-Link), no port forwarding |
+| How it hears about a push | GitHub **App** — grant repo access once, GitHub pushes to an address that is always reachable | GitHub **webhook** — GitHub must POST *into* the house |
+
+Vercel felt like "just allow the repo" because the hard part, being reachable, was already
+true. Every option for fixing Dokploy is really an answer to *how does an event from the
+public internet reach a machine with no public address* — and it would be identical for
+Coolify, CapRover, or a bare compose box. Self-hosting buys control and costs reachability.
+
+Three things must line up. Only the third is difficult.
 
 1. **Content type `application/json`.** Not `x-www-form-urlencoded`. Dokploy reads `ref` and
    `repository.full_name` out of the JSON body; form-encoding hands it a single `payload=`
    string it never parses.
 2. **The branch must match exactly.** Dokploy compares the payload's `ref` against
    `refs/heads/<its configured branch>` and answers `{"message":"Branch Not Match"}` on any
-   difference. App -> General -> Branch, and the branch you actually push, are the two
-   values.
+   difference. App -> General -> Branch, and the branch you actually push, are the two values.
 3. **GitHub must be able to reach the panel**, and by default it cannot.
 
-`dokploy.rakawidjaja.com` resolves publicly to `192.168.0.3` — an RFC 1918 address. It works
-from the LAN and is unroutable from anywhere else, so every webhook delivery fails at the
-connection, whatever the content type and branch say. This is the same private-IP-in-public-DNS
-disclosure noted elsewhere; it is also the thing that breaks auto-deploy.
+#### The DNS finding that looks like a bug and is not
 
-**A Cloudflare Tunnel is the fix**, and it needs no port forwarding, no public IP, and no
-inbound firewall rule — `cloudflared` dials out and Cloudflare routes back down that
-connection.
+`deploy.rakawidjaja.com` resolves to `192.168.0.3`. So does `dokploy.rakawidjaja.com`,
+`portfolio.rakawidjaja.com`, and `zzz-nonexistent-test.rakawidjaja.com` — because
+**`*.rakawidjaja.com` is a wildcard A record** pointing there. `192.168.0.3` is CT101
+`proxy`, running nginx-proxy-manager with 22 LAN-only vhosts. It is correct as it is.
+
+Two consequences worth writing down, because both cost time once:
+
+- **There is no stale record to delete** before adding a tunnel hostname. Cloudflare writes a
+  specific proxied CNAME, and a specific record beats a wildcard. Nothing to clean up first.
+- **The wildcard publishes an RFC 1918 address to the world.** Minor information disclosure,
+  pre-dates this project, unchanged here — but it is also why every webhook delivery failed
+  at the connection regardless of content type or branch.
+
+#### The fix: a Cloudflare Tunnel, gated by Access
+
+Outbound-only. `cloudflared` dials out and Cloudflare routes back down that connection — no
+port forwarding, no public IP, no inbound firewall rule.
 
 Expose a deploy endpoint, not the panel. One hostname reaching the Dokploy container is
-enough for the webhook, and it keeps the login form off the public internet. Tunnelling
-`dokploy.rakawidjaja.com` itself works too, but then the dashboard is public and wants
-Cloudflare Access in front of it with a bypass rule carved out for the webhook path — more
-surface and more configuration for the same result.
+enough for the webhook, and it keeps the dashboard off the public internet.
 
-**In Cloudflare** (Zero Trust -> Networks -> Tunnels):
-
-1. Create a tunnel, connector type `cloudflared`. Copy the token.
-2. Add a public hostname:
-
-   | Field | Value |
-   | --- | --- |
-   | Subdomain | `deploy` |
-   | Domain | `rakawidjaja.com` |
-   | Service type | `HTTP` |
-   | URL | `host.docker.internal:3000` |
-
-   **The origin URL depends on how `cloudflared` was installed**, and getting it wrong is
-   the difference between a 200 and a 502:
-
-   | Install | Origin URL |
-   | --- | --- |
-   | Plain `docker run` with `--add-host=host.docker.internal:host-gateway` (what is deployed) | `host.docker.internal:3000` |
-   | Dokploy application, on Dokploy's own Docker network | `dokploy:3000` |
-   | `cloudflared service install` on the host itself | `localhost:3000` |
-
-   **A `deploy` DNS record must not already exist.** Adding the public hostname creates a
-   CNAME to `<tunnel-uuid>.cfargotunnel.com`; a pre-existing A record wins and the name keeps
-   resolving to the private address, which looks exactly like a tunnel that never came up.
-   Delete the old record first.
-3. SSL/TLS mode: **Full**. Not Flexible — it produces redirect loops against Traefik.
-
-**The connector is already running** on the Dokploy VM (192.168.0.22), installed 2026-09-06 as
-a plain container so it survives a Dokploy reinstall and does not depend on the panel it exists
-to reach:
+**The connector is already running** on vm202 as `cloudflared-portfolio`, matching the house
+pattern used by `cloudflared-memora`, `cloudflared-9router` and the Vaultwarden tunnel — one
+dedicated container per service, on `dokploy-network`, Access in front:
 
 ```sh
-docker run -d --name cloudflared --restart=always \
-  --add-host=host.docker.internal:host-gateway \
+docker run -d --name cloudflared-portfolio --restart=always \
+  --network dokploy-network \
   cloudflare/cloudflared:latest tunnel --no-autoupdate run --token <token>
 ```
 
-Four `Registered tunnel connection` lines (connIndex 0-3) is a healthy connector. `cloudflared-memora`
-on the same host is a different tunnel for a different project — leave it alone.
+Four `Registered tunnel connection` lines (connIndex 0-3) is a healthy connector. Being on
+`dokploy-network` is what lets it resolve `dokploy` and `dokploy-traefik` by name; a container
+on the default bridge cannot, and needs `--add-host=host.docker.internal:host-gateway` plus
+`host.docker.internal:3000` instead. That works, but it is off-pattern — prefer the network.
 
-**Reaching that VM.** It has no SSH key that this workstation holds, and its Docker socket is not
-exposed. The way in is the Proxmox hypervisor at `192.168.0.10` (`pve`, key `id_ed25519_proxmox`),
-where `dokploy` is **VMID 202** with the QEMU guest agent enabled:
+`cloudflared-memora` on the same host is a different tunnel for a different project. Leave it.
 
-```sh
-ssh root@192.168.0.10 'qm guest exec 202 -- /bin/sh -c "<command>"'
-```
+**In Cloudflare** (Zero Trust -> Networks -> Tunnels), add a public hostname:
 
-That runs as root inside the VM and returns JSON with an `out-data` field. Use it for anything
-the panel cannot do.
+| Field | Value |
+| --- | --- |
+| Subdomain | `deploy` |
+| Domain | `rakawidjaja.com` |
+| Service type | `HTTP` |
+| URL | `dokploy:3000` |
+
+SSL/TLS mode: **Full**. Not Flexible — it produces redirect loops against Traefik.
+
+**Then gate it** (Zero Trust -> Access -> Applications). Access cannot authenticate GitHub —
+a webhook cannot complete an email OTP — so the deploy path is unavoidably open, and the
+policy order is what contains it:
+
+| Order | Path | Policy |
+| --- | --- | --- |
+| 1 | `/api/deploy/*` | **Bypass** — Everyone |
+| 2 | `/*` | **Allow** — your email, one-time PIN |
+
+Everything except the token-guarded deploy endpoint is behind OTP. A leaked deploy token then
+buys an attacker exactly one thing: triggering a staging rebuild of a public repo. Rotate it
+from the Dokploy app's webhook URL; it is the only credential guarding that path.
 
 **In the app being deployed:** General -> Auto Deploy on, branch set to the branch you push.
 
@@ -234,9 +243,6 @@ the panel cannot do.
 | SSL verification | Enabled |
 | Events | Just the push event |
 
-The deploy token is the path segment Dokploy shows in its own webhook URL. Treat it as a
-credential — it is the only thing guarding the endpoint.
-
 **Verify** without waiting for a push:
 
 ```sh
@@ -246,16 +252,49 @@ curl -sS -X POST https://deploy.rakawidjaja.com/api/deploy/<token> \
 # {"message":"Application deployed successfully"}
 ```
 
-Then push, and read GitHub's Recent Deliveries tab. A green 200 is the whole contract; a
-red timeout means the tunnel is not up, and `Branch Not Match` means item 2 above.
+Then push, and read GitHub's Recent Deliveries tab. A green 200 is the whole contract; a red
+timeout means the tunnel is not up, and `Branch Not Match` means item 2 above.
 
-**The staging origin does not change** unless you also route it through the tunnel. Doing so
-would earn real HTTPS and retire the sslip.io hostname above, but it is a separate decision
-with its own consequence: it puts staging on the public internet. `robots.txt` still serves
-`Disallow: /` there, so it stays out of search results either way, and it would need a
-rebuild — the origin is baked in at build time (§1) — with a value that is **not** the
-production origin, or `isProduction` flips and staging starts advertising itself as
-crawlable.
+#### Reaching vm202
+
+The key is `vm202_id_ed25519` in `D:/Documents/Raka/HomeServer/docs/secrets/`, per that
+repo's `secrets/README.md`:
+
+```sh
+ssh -i D:/Documents/Raka/HomeServer/docs/secrets/vm202_id_ed25519 root@192.168.0.22
+```
+
+If that key is ever lost, the hypervisor is the way back in: `192.168.0.10` (`pve`, key
+`proxmox_id_ed25519`) has `dokploy` as **VMID 202** with the QEMU guest agent enabled, so
+`qm guest exec 202 -- /bin/sh -c "<command>"` runs as root inside the VM and returns JSON with
+an `out-data` field. Slower and clumsier than SSH; useful exactly once.
+
+### Naming a staging hostname
+
+`portfolio-staging.rakawidjaja.com` — **one label deep, and project-scoped.**
+
+Both halves are constraints, not taste:
+
+- **One label.** Cloudflare Universal SSL on the free plan covers `rakawidjaja.com` and
+  `*.rakawidjaja.com` and nothing deeper — verified from the served certificate's SANs.
+  `portfolio.staging.rakawidjaja.com` is two levels and would fail TLS verification for every
+  visitor; multi-level wildcards need paid Advanced Certificate Manager.
+- **Project first, not environment first.** `staging.rakawidjaja.com` claims the whole
+  namespace for whichever project got there first. `<project>-staging` scales —
+  `memora-staging`, `bookorbit-staging` — and sorts by project, which is how these are
+  actually thought about.
+
+**Using it requires a rebuild**, because of §1: the origin is baked in at build time. Pass
+`NEXT_PUBLIC_SITE_URL=https://portfolio-staging.rakawidjaja.com` as a build argument. It must
+**not** be the production origin, or `isProduction` flips and staging starts serving `Allow: /`
+to crawlers. Route it through the tunnel with a second public hostname pointing at
+`dokploy-traefik:80` (so Traefik keeps doing Host-based routing), set the app's domain to match
+in Dokploy, and leave Dokploy's own HTTPS/Let's Encrypt off — Cloudflare terminates TLS at the
+edge and internal traffic stays HTTP. Put an Access policy in front of it too: staging is not
+for the public, and `robots.txt` alone only stops well-behaved crawlers.
+
+Until that rebuild happens, staging stays at `portfolio-web.192.168.0.22.sslip.io`, LAN-only,
+plain HTTP.
 
 ---
 
