@@ -139,6 +139,98 @@ Two related notes, neither of them a fault:
 - **HSTS over plain HTTP** is inert — browsers ignore `Strict-Transport-Security` on a
   non-secure connection. `next.config.mjs` sends it unconditionally; leave it.
 
+
+### Auto-deploy on push
+
+Dokploy does not poll. It waits for a POST from GitHub, and until 2026-09-06 nothing was
+sending one — the repo had no webhook at all, and the last two commits were on `staging`
+while the app was configured for `main`.
+
+Three things have to line up. Only the third is difficult.
+
+1. **Content type `application/json`.** Not `x-www-form-urlencoded`. Dokploy reads `ref` and
+   `repository.full_name` out of the JSON body; form-encoding hands it a single `payload=`
+   string it never parses.
+2. **The branch must match exactly.** Dokploy compares the payload's `ref` against
+   `refs/heads/<its configured branch>` and answers `{"message":"Branch Not Match"}` on any
+   difference. App -> General -> Branch, and the branch you actually push, are the two
+   values.
+3. **GitHub must be able to reach the panel**, and by default it cannot.
+
+`dokploy.rakawidjaja.com` resolves publicly to `192.168.0.3` — an RFC 1918 address. It works
+from the LAN and is unroutable from anywhere else, so every webhook delivery fails at the
+connection, whatever the content type and branch say. This is the same private-IP-in-public-DNS
+disclosure noted elsewhere; it is also the thing that breaks auto-deploy.
+
+**A Cloudflare Tunnel is the fix**, and it needs no port forwarding, no public IP, and no
+inbound firewall rule — `cloudflared` dials out and Cloudflare routes back down that
+connection.
+
+Expose a deploy endpoint, not the panel. One hostname reaching the Dokploy container is
+enough for the webhook, and it keeps the login form off the public internet. Tunnelling
+`dokploy.rakawidjaja.com` itself works too, but then the dashboard is public and wants
+Cloudflare Access in front of it with a bypass rule carved out for the webhook path — more
+surface and more configuration for the same result.
+
+**In Cloudflare** (Zero Trust -> Networks -> Tunnels):
+
+1. Create a tunnel, connector type `cloudflared`. Copy the token.
+2. Add a public hostname:
+
+   | Field | Value |
+   | --- | --- |
+   | Subdomain | `deploy` |
+   | Domain | `rakawidjaja.com` |
+   | Service type | `HTTP` |
+   | URL | `dokploy:3000` |
+
+   `dokploy` is the panel's container name on Dokploy's Docker network, which `cloudflared`
+   joins by being deployed as a Dokploy app. The DNS record is created for you.
+3. SSL/TLS mode: **Full**. Not Flexible — it produces redirect loops against Traefik.
+
+**In Dokploy**, deploy `cloudflared` as an application:
+
+| Field | Value |
+| --- | --- |
+| Provider | Docker |
+| Image | `cloudflare/cloudflared` |
+| Environment | `TUNNEL_TOKEN=<the token>` |
+| Advanced -> Arguments | `tunnel`, `run` |
+
+**In the app being deployed:** General -> Auto Deploy on, branch set to the branch you push.
+
+**In GitHub** (Settings -> Webhooks -> Add webhook):
+
+| Field | Value |
+| --- | --- |
+| Payload URL | `https://deploy.rakawidjaja.com/api/deploy/<the app's deploy token>` |
+| Content type | `application/json` |
+| SSL verification | Enabled |
+| Events | Just the push event |
+
+The deploy token is the path segment Dokploy shows in its own webhook URL. Treat it as a
+credential — it is the only thing guarding the endpoint.
+
+**Verify** without waiting for a push:
+
+```sh
+curl -sS -X POST https://deploy.rakawidjaja.com/api/deploy/<token> \
+  -H 'Content-Type: application/json' -H 'X-GitHub-Event: push' \
+  -d '{"ref":"refs/heads/<branch>","repository":{"full_name":"<owner>/<repo>"}}'
+# {"message":"Application deployed successfully"}
+```
+
+Then push, and read GitHub's Recent Deliveries tab. A green 200 is the whole contract; a
+red timeout means the tunnel is not up, and `Branch Not Match` means item 2 above.
+
+**The staging origin does not change** unless you also route it through the tunnel. Doing so
+would earn real HTTPS and retire the sslip.io hostname above, but it is a separate decision
+with its own consequence: it puts staging on the public internet. `robots.txt` still serves
+`Disallow: /` there, so it stays out of search results either way, and it would need a
+rebuild — the origin is baked in at build time (§1) — with a value that is **not** the
+production origin, or `isProduction` flips and staging starts advertising itself as
+crawlable.
+
 ---
 
 ## 4. Post-deploy verification
