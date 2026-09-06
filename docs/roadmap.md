@@ -597,7 +597,7 @@ The done-condition, run three times and reverted each time:
 The lint result is the useful one: it means the naive form of the leak was already blocked,
 and the isolation test earns its place by catching the form that was not.
 
-### Four traps this milestone turned up
+### Five traps this milestone turned up
 
 1. **`lighthouse` as a devDependency drags in four high-severity advisories** —
    `puppeteer-core` → `@puppeteer/browsers` → `extract-zip@2.0.1`
@@ -614,6 +614,13 @@ and the isolation test earns its place by catching the form that was not.
    does not finish until its pipes close, so the job times out at six hours with no failing
    assertion to point at. The serve step redirects to a file, and an `if: failure()` step
    prints it, so "the server died" stays distinguishable from "an assertion failed".
+5. **The stale-server guard was Windows-only correct, and CI was the first thing to say so.**
+   Its asset regex, `/\/_next\/static\/[^"']+/g`, also matched the copies the RSC flight
+   payload embeds inside a JSON string, where the closing delimiter is `\"` — so it ran one
+   character past the quote and produced a path ending in a backslash. `existsSync` tolerates
+   a trailing separator on Windows and rejects it on Linux. Six milestones green here; the
+   first CI run reported *"Stale server: 4 of 17 served assets are absent from .next"* against
+   a build that was entirely present. A backslash in the character class is the whole fix.
 
 ### Carried out of M7
 
