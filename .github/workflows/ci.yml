@@ -19,15 +19,21 @@ jobs:
       - name: Contrast gate (design-system.md §1.3)
         run: npm run check:contrast
 
-      # ADVISORY ON PR, BLOCKING ON DEPLOY (docs/roadmap.md M8).
+      # ADVISORY HERE, MANUAL ON DEPLOY (docs/deploy.md §5).
       #
       # This step exits 1 by design while content is deferred, and it is step 3
       # of 12: leaving it blocking meant lint, typecheck and build never ran in
       # CI on any commit from M1 to M7 — the workflow was red for six
       # milestones and told us nothing. The placeholder count is still printed
-      # and still read; M8 re-tightens this on the deploy path, where shipping
-      # a TODO email actually costs something.
-      - name: Placeholder gate (advisory — see docs/roadmap.md M8)
+      # and still read.
+      #
+      # M8 was supposed to re-tighten this and did not: all real content is
+      # deferred to the content milestone, so gating the production build on it
+      # today would fail every deploy by design. It is a manual pre-flight step
+      # in docs/deploy.md §5 in the meantime, and the CI-level re-tightening is
+      # recorded against the content milestone in docs/roadmap.md M8 rather
+      # than left as a comment pointing at a milestone that passed it by.
+      - name: Placeholder gate (advisory — see docs/deploy.md §5)
         run: npm run check:content
         continue-on-error: true
 

@@ -626,27 +626,115 @@ and the isolation test earns its place by catching the form that was not.
 
 - **Performance is 92–94 on three routes locally**, against a floor of 95. Recorded, not
   lowered. M8 measures against Vercel.
-- **CI has not yet been observed green.** Every gate passes locally; the first real run is
-  the push that carries this milestone.
+- **CI has now been observed, and it is not green.** The first real run failed on the
+  stale-server guard, which was a Windows-only-correct regex rather than a real defect in
+  the site (trap 5 above). With that fixed, steps 13–15 — the homepage suite, the persona
+  suite, and the a11y gate — passed in CI for the first time ever. Step 16, the §8 budget
+  gate, is red on exactly one assertion: **homepage performance 93**. Every other route
+  scores 96–98, including the three that measured 92–94 locally. So the Linux runner does
+  hold the floor; the local variance was this machine, and what survives to a clean host is
+  the homepage LCP that M1 and M2 both recorded. It is no longer plausibly noise. M8 settles
+  it against production.
 
 ---
 
 ## M8 — Deploy
 
-- `Dockerfile`: multi-stage, `output: "standalone"`, non-root user, healthcheck.
-- `.dockerignore`.
-- Dokploy staging deploy documented in `docs/deploy.md`.
-- Vercel production, `portfolio.rakawidjaja.com` custom domain, DNS, HTTPS.
-- Verify security headers, `robots.txt`, and `sitemap.xml` on the live production origin —
-  not just locally.
-- Post-deploy Lighthouse run against production. **This is the authoritative reading of the
-  §8 budgets** — the local M1 numbers were taken under 4× CPU throttling on a machine also
-  serving the site. Settle the open M1 LCP finding here: if production LCP is under 2.0s,
-  record it and close the item; if it is not, fix it in this milestone. M2's `/swe` reading
-  (2.5s) is the same finding on a second route, and is settled by the same measurement.
+Artifacts built and verified locally. The hosted half — the Vercel and Dokploy account
+actions, the custom domain and DNS — is executable from `docs/deploy.md` and is not
+something this repo can do to itself.
 
-**Done when:** staging and production both serve the site, and a live `curl` confirms
-persona routes are `noindex` and absent from the sitemap.
+**Shipped:**
+
+- `Dockerfile` — three stages on `node:22-alpine`, non-root `node` user, busybox
+  `HEALTHCHECK`, `CMD ["node", "server.js"]`. Built and run: the image serves, the health
+  check reports `healthy`, `whoami` in the container returns `node`, and the full suite
+  (`test:e2e`, `test:persona`, `check:a11y`) passes against it.
+- `.dockerignore` — `.next` and `.env*` are correctness entries, not size ones. Without
+  the first, this machine's build ships in the context and can shadow the builder's.
+- `.env.example`, now actually tracked — see trap 1 below.
+- `.nvmrc` (`22`) and `engines.node: ">=22"`. Before this the only Node pin in the repo was
+  `ci.yml`; Vercel and the Docker base image each chose their own.
+- Security headers in `next.config.mjs` — HSTS, nosniff, Referrer-Policy, X-Frame-Options,
+  Permissions-Policy, CSP, and `poweredByHeader: false`. `headers()` is honoured by both the
+  standalone server and Vercel, so there is no `vercel.json` holding a second copy.
+- A `[headers]` group in `tests/persona.mjs` asserting every one of them on a live response,
+  which is what makes "verify security headers on the live production origin" a command
+  rather than a thing someone remembers to `curl`.
+- `docs/deploy.md` — the runbook, including the pre-flight content gate (trap 4).
+
+**The standalone server ran for the first time.** `ci.yml` deliberately uses `npx next
+start`, so `node .next/standalone/server.js` — the code path the image actually uses — had
+never been exercised in eight milestones. It works, after copying `.next/static` and
+`public/` beside `server.js`; the full suite passes against it. Had it not, it would have
+been broken in the image too, and the first symptom would have been a staging deploy.
+
+### Four traps this milestone turned up
+
+1. **`.env.example` had never been committed.** `.gitignore` carried `.env*` with no
+   negation, so the file sat on one disk for eight milestones while `lib/env.ts` told
+   readers to declare every variable in it. A fresh clone got no env documentation at all.
+   `!.env.example` is a one-line fix for a defect that could only be found by looking.
+
+2. **`NEXT_PUBLIC_SITE_URL` is inlined at build time, so one image serves one origin.**
+   `lib/env.ts` falls back to the production origin, which makes the failure quiet rather
+   than loud: a staging image built without the variable serves production canonicals, a
+   production `sitemap.xml` and production OG URLs to every crawler that reaches it. It is
+   therefore a Docker **build ARG**, not a runtime env. Verified by building with
+   `--build-arg NEXT_PUBLIC_SITE_URL=https://staging.example.test` and reading the
+   container's `sitemap.xml` back: it carries the staging origin.
+
+3. **An absent `script-src` does not mean "scripts unrestricted" — `default-src` is its
+   fallback.** This CSP shipped its first version deliberately without a `script-src`, on
+   the reasoning that a nonce forces dynamic rendering and hashes break on framework
+   upgrades. Both of those remain true; the conclusion drawn from them did not. `default-src
+   'self'` applied to scripts, and the browser blocked every inline one — the pre-paint
+   theme script, Next's bootstrap, hydration. The whole page went non-interactive. **Four
+   assertions in `tests/persona.mjs` caught it within a minute**; reading the header would
+   not have, and neither would a page that still renders its server HTML perfectly. The fix
+   is an explicit `script-src 'self' 'unsafe-inline'`, and the honest note that goes with
+   it: that directive is not XSS protection. The value of this CSP is `object-src 'none'`,
+   `base-uri 'self'`, `frame-ancestors 'none'` and `form-action 'self'`, which are real and
+   cost nothing.
+
+4. **The stale-server guard could not tell a stale server from a foreign one.** It compares
+   served assets against the local `.next`, which is only meaningful when the origin *is*
+   this checkout's build. Pointed at the Docker container it reported "5 of 17 served assets
+   are absent" against a perfectly healthy image whose only sin was being a different build
+   — and it would have done exactly the same against production, which is where the M8
+   done-condition is verified. It now runs only when `BASE_URL` is unset. Presence of the
+   variable is the only available signal, since the default and an explicit
+   `localhost:3000` are the same string. A separate unconditional reachability check keeps
+   a typo'd `BASE_URL` surfacing as one clear line instead of thirty assertion failures.
+
+### The `check:content` gate could not be re-tightened here, and that is recorded, not dropped
+
+`ci.yml` marks the placeholder gate `continue-on-error: true` and its comment names M8 as
+the milestone that re-tightens it on the deploy path. **M8 does not.** All real content —
+the email, LinkedIn, GitHub and WhatsApp links, the persona prose, the five `outcome`
+lines, the CV PDF, six case studies, twelve posts — is deliberately deferred to the content
+milestone, so wiring the gate into the production build command today would fail every
+production deploy by design.
+
+It lands instead as a **pre-flight step in `docs/deploy.md` §5**: `npm run check:content`
+must exit 0 before a production deploy is considered real. The CI-level re-tightening moves
+to the content milestone, named here rather than left as a comment pointing at a milestone
+that passed it by. Until then that manual step is the only thing standing between a `TODO`
+email address and production.
+
+### Carried out of M8
+
+- **Homepage performance 93 in CI, against a floor of 95.** Unresolved, and deliberately so:
+  the production Lighthouse run is the authoritative §8 reading and production does not
+  exist yet. CI stays red on this one assertion until it does. Settle it with
+  `BASE_URL=https://portfolio.rakawidjaja.com npm run check:budget` immediately after the
+  first production deploy — if it holds ≥ 95, record that and close the M1 (2.53s) and M2
+  (2.5s) LCP findings; if it does not, fix it before calling this milestone done.
+
+**Done when:** staging and production both serve the site, and
+`BASE_URL=<origin> npm run test:persona` passes against the live origin — which asserts the
+`noindex`, the null canonical, the absence of persona paths from `sitemap.xml`, the absence
+of a `Disallow` from `robots.txt`, and every security header, in one command.
 
 ---
 

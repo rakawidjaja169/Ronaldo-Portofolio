@@ -18,6 +18,11 @@ yarn-error.log*
 
 # env files
 .env*
+# ...but NOT the example. This negation is load-bearing: `.env*` above matched
+# .env.example too, so it sat untracked on one machine for eight milestones
+# while lib/env.ts told readers to declare every variable in it. A fresh
+# clone got no env documentation at all.
+!.env.example
 
 # vercel
 .vercel

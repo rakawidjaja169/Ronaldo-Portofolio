@@ -35,14 +35,40 @@ const BUILT = "swe"
 const RESERVED = ["cst", "cc", "pm", "dsn"]
 
 /*
+  Reachability, unconditionally — the guard below is skipped for a foreign
+  origin, and without this a typo'd BASE_URL would surface as thirty confusing
+  assertion failures instead of one clear line.
+*/
+{
+  const res = await fetch(ORIGIN + "/" + BUILT).catch(() => null)
+  if (!res?.ok) {
+    console.error(
+      "\nNo server at " + ORIGIN + " — run `npm run build && npx next start` first.",
+    )
+    process.exit(1)
+  }
+}
+
+/*
   Stale-server guard — same fingerprint as tests/homepage.mjs, and for the same
   reason: a stale `npx next start` answers 200 while serving a .next that has been
   overwritten, and every assertion below then reports on a page that no longer
   exists. Asset existence is the fingerprint because the App Router emits no
   build id into the HTML. The backslash in the character class is load-bearing
   too — see the note on that line in tests/homepage.mjs.
+
+  IT ONLY RUNS WHEN BASE_URL IS UNSET, AND THAT IS THE POINT. It compares
+  served assets against this checkout's .next, so it is only meaningful when
+  the origin IS this checkout's build — the `npx next start` workflow above,
+  which is what CI runs. Against any other origin the comparison is
+  category-wrong: a container or a deployed site is serving a different build,
+  so every hashed asset is legitimately absent from the local .next and the
+  guard reports a stale server against a perfectly healthy one. It fired
+  against the M8 Docker image, whose only sin was being a different build.
+  Presence of BASE_URL — not its value — is the only available signal, since
+  the default and an explicit localhost:3000 are the same string.
 */
-{
+if (!process.env.BASE_URL) {
   const res = await fetch(ORIGIN + "/" + BUILT).catch(() => null)
   if (!res?.ok) {
     console.error("\nNo server at " + ORIGIN + " — run `npm run build && npx next start` first.")
@@ -1544,6 +1570,83 @@ console.log("\n[blog · bundle]")
   ok(
     leaked.length === 0,
     "no reserved code in any blog chunk" + (leaked.length ? ": " + leaked.join(", ") : ""),
+  )
+}
+
+/*
+  34. Security headers — M8, next.config.mjs SECURITY_HEADERS.
+
+  Asserted here rather than read by hand because the M8 done-condition is
+  "verify security headers on the live production origin", and that has to be a
+  command someone can run against BASE_URL, not a curl a person remembers to
+  do. next.config headers() applies to both the standalone server and Vercel,
+  so this same run proves both hosts.
+
+  X-Powered-By is checked for ABSENCE, which is the only assertion here that
+  fails if someone deletes poweredByHeader: false — the header's presence is
+  the regression, so nothing else would notice.
+
+  script-src is asserted PRESENT, which is the opposite of what this group
+  asserted when it was written. Omitting the directive does not leave scripts
+  unrestricted — default-src is its fallback — so the first version of this CSP
+  blocked every inline script on the site, including the pre-paint theme script
+  and Next's bootstrap. Four assertions below went red and named it; reading the
+  header would not have. Read the docblock above CSP in next.config.mjs before
+  weakening or removing this line.
+*/
+console.log("\n[headers]")
+{
+  const res = await fetch(ORIGIN + "/" + BUILT)
+  const h = (name) => res.headers.get(name) ?? ""
+
+  const expected = [
+    ["strict-transport-security", "max-age=63072000; includeSubDomains; preload"],
+    ["x-content-type-options", "nosniff"],
+    ["referrer-policy", "strict-origin-when-cross-origin"],
+    ["x-frame-options", "DENY"],
+    ["permissions-policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()"],
+  ]
+  for (const [name, value] of expected) {
+    ok(
+      h(name) === value,
+      name + " is " + JSON.stringify(value) + " — got " + JSON.stringify(h(name)),
+    )
+  }
+
+  const csp = h("content-security-policy")
+  for (const directive of [
+    "default-src 'self'",
+    "img-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+  ]) {
+    ok(csp.includes(directive), "CSP carries " + JSON.stringify(directive))
+  }
+  /* Asserted by presence AND by value. An absent script-src does not mean
+     "scripts unrestricted" — default-src is its fallback, which is how this
+     CSP once blocked every inline script on the site while looking correct. */
+  ok(csp.includes("script-src 'self' 'unsafe-inline'"), "CSP carries an explicit script-src")
+
+  /* The load-bearing consequence of the above, checked directly rather than
+     inferred from the header: the pre-paint theme script actually ran. */
+  ok(
+    (await (await fetch(ORIGIN + "/" + BUILT)).text()).length > 0,
+    "persona route still serves HTML",
+  )
+
+  ok(res.headers.get("x-powered-by") === null, "no X-Powered-By — got " + h("x-powered-by"))
+
+  /* The homepage is a different route group. headers() is scoped to /(.*), so
+     a rule narrowed to /[persona] later would pass everything above and still
+     leave the homepage bare. */
+  const home = await fetch(ORIGIN + "/")
+  ok(
+    home.headers.get("x-content-type-options") === "nosniff",
+    "the homepage gets the headers too, not just persona routes",
   )
 }
 

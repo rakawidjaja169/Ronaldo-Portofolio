@@ -1,0 +1,24 @@
+# Build context only. Nothing here reaches the image, and two of these entries
+# are correctness rather than size:
+#
+#   .next     — without it, this machine's build is copied into the context and
+#               can shadow the one the builder stage produces. A stale local
+#               build silently becomes the image.
+#   .env*     — .env.local is not tracked but it is on disk; a COPY . . would
+#               bake local overrides into a shared image.
+
+node_modules
+.next
+out
+.git
+.github
+docs
+tests
+scripts
+.env*
+!.env.example
+*.log
+.tmp-*
+README.md
+.vscode
+.idea

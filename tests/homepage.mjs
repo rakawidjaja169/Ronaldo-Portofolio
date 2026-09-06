@@ -31,6 +31,21 @@ const URL = process.env.BASE_URL ?? "http://localhost:3000/"
 const ACCENT_RGB = "rgb(255, 145, 77)"
 
 /*
+  Reachability, unconditionally — the guard below is skipped for a foreign
+  origin, and without this a typo'd BASE_URL would surface as thirty confusing
+  assertion failures instead of one clear line.
+*/
+{
+  const res = await fetch(URL).catch(() => null)
+  if (!res?.ok) {
+    console.error(
+      "\nNo server at " + URL + " — run `npm run build && npx next start` first.",
+    )
+    process.exit(1)
+  }
+}
+
+/*
   Fail fast if the running server is not the build on disk.
 
   A stale `npx next start` left on :3000 keeps answering 200 while serving a .next
@@ -48,11 +63,21 @@ const ACCENT_RGB = "rgb(255, 145, 77)"
   locally for six milestones and failed the first CI run it was ever part of,
   reporting "4 of 17 assets absent" against a build that was entirely present.
 
+  IT ONLY RUNS WHEN BASE_URL IS UNSET, AND THAT IS THE POINT. It compares
+  served assets against this checkout's .next, so it is only meaningful when
+  the origin IS this checkout's build — the `npx next start` workflow, which is
+  what CI runs. Against any other origin the comparison is category-wrong: a
+  container or a deployed site serves a different build, so every hashed asset
+  is legitimately absent from the local .next and the guard reports a stale
+  server against a perfectly healthy one. Presence of BASE_URL — not its value
+  — is the only available signal, since the default and an explicit
+  localhost:3000 are the same string.
+
   Fingerprint is asset existence, not a build id: the App Router does not
   emit one into the HTML, but a stale server references hashed chunks that
   are no longer on disk, which is exactly the condition worth failing on.
 */
-{
+if (!process.env.BASE_URL) {
   const res = await fetch(URL).catch(() => null)
   if (!res?.ok) {
     console.error("\nNo server at " + URL + " — run `npm run build && npx next start` first.")
