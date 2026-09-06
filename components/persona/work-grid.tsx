@@ -18,8 +18,8 @@ import { cn } from "@/lib/utils"
  *
  * CLS WHILE FILTERING is the milestone's hard requirement (< 0.05). Two things
  * hold it: every card's image sits in a fixed `aspect-[16/10]` box so a card's
- * own height never depends on a loaded image, and filtering only adds or
- * removes whole grid items — nothing inside a surviving card reflows. The page
+ * own height never depends on a loaded image, and filtering only toggles whole
+ * grid items in and out of layout — nothing inside a card reflows. The page
  * below the grid does move when the grid shortens, but that is a
  * user-initiated interaction and excluded from CLS by definition.
  */
@@ -91,9 +91,33 @@ export function WorkGrid({
       ) : null}
 
       {visible.length > 0 ? (
+        /*
+          EVERY item is rendered, every time; filtering only toggles `hidden`.
+
+          Mapping over `visible` instead unmounted and remounted children on
+          each filter change, and that is a bug rather than a preference:
+          RevealGroup animates with `whileInView` + `viewport={{ once: true }}`,
+          so Framer disconnects the observer after the first reveal. A card
+          remounting after that inherits the parent's `initial="hidden"` and
+          nothing is left to move it to `visible` — it came back to the DOM at
+          opacity 0 and stayed there. The one-frame paint before the variant
+          applied was the "blink". Keep the children mounted and the one-shot
+          trigger cannot be raced.
+
+          `display: none` also drops the card from the accessibility tree,
+          which is the right semantics for a filtered-out item. The image box
+          keeps its fixed aspect ratio either way, so the CLS budget is
+          untouched.
+        */
         <RevealGroup as="ul" className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((item) => (
-            <RevealItem as="li" key={item.slug}>
+          {items.map((item) => (
+            <RevealItem
+              as="li"
+              key={item.slug}
+              className={cn(
+                activeTag && !item.tags.includes(activeTag) ? "hidden" : undefined,
+              )}
+            >
               <ProjectCard
                 item={item}
                 personaCode={personaCode}

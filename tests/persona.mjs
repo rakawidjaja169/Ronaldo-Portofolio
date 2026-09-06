@@ -422,7 +422,13 @@ console.log("\n[work grid]")
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
   await page.goto(ORIGIN + "/" + BUILT, { waitUntil: "networkidle" })
 
-  const cards = page.locator("#work article")
+  /*
+    `:visible`, not a bare `#work article`. Filtering toggles `hidden` on the
+    grid items rather than unmounting them — see work-grid.tsx for why — so a
+    DOM count no longer distinguishes shown from filtered-out, and the whole
+    point of these assertions is that distinction.
+  */
+  const cards = page.locator("#work article:visible")
   const total = await cards.count()
   ok(total > 0, "grid renders " + total + " cards")
 
@@ -576,6 +582,20 @@ console.log("\n[work grid]")
   await all.click()
   await page.waitForTimeout(500)
   ok((await cards.count()) === total, "the All chip restores every card")
+  /*
+    Count is not enough, and that is not hypothetical: it is exactly what let a
+    real bug ship. Filtering used to remount the grid's children, and a card
+    remounting after RevealGroup's `once: true` observer had already fired
+    inherited `initial="hidden"` with nothing left to reveal it. Every card was
+    back in the DOM at opacity 0, and the count assertion above passed.
+  */
+  const faded = await page.evaluate(
+    () =>
+      [...document.querySelectorAll("#work article")].filter(
+        (el) => getComputedStyle(el.parentElement).opacity !== "1",
+      ).length,
+  )
+  ok(faded === 0, "every restored card is actually visible (" + faded + " faded)")
 
   await browser.close()
 }
