@@ -293,9 +293,32 @@ Non-negotiable. Any violation blocks merge.
 | INP | < 200ms |
 | Initial JS (gzipped) | < 200KB |
 | three.js chunk (gzipped, lazy) | < 130KB |
-| Lighthouse, all four categories, mobile | ≥ 95 |
+| Lighthouse: performance, accessibility, best-practices (mobile) | ≥ 95 |
+| Lighthouse: SEO | see the exception below |
 
-Enforced by a Lighthouse CI gate on every PR. Regression fails the build.
+Enforced by a Lighthouse CI gate on every PR — `scripts/check-budget.mjs`, wired in as
+`npm run check:budget`. Regression fails the build.
+
+**The SEO exception, and why it is permanent.** A persona route cannot score ≥ 95 on SEO
+and satisfy `product.md` §2.4 at the same time. §2.4 requires `robots: noindex` on every
+persona route; Lighthouse then fails `is-crawlable`, and the category lands at 63–66. That
+is the product working, not a defect, so the gate does not assert the SEO *score* on those
+routes. It asserts the *set of failing SEO audits*, per route:
+
+- On `/` — the one public, indexed page — the set must be **empty**. `is-crawlable` must PASS.
+- On every persona route the set must be **exactly `{is-crawlable}`**. It must FAIL.
+
+A missing title, a bad meta description, or an unreadable font size adds a second id and
+still fails the build, so this is not a blanket exemption — it is a tighter assertion than
+a score threshold, because it also catches a persona route that has silently *become*
+crawlable. Removing `robots: { index: false }` from any persona route turns the gate red.
+
+**The measured numbers** on the M7 local run (Windows, serving the site and running the
+throttled audit on the same CPU, which costs ~8 points of variance): homepage 95/100/100/100,
+persona 95, blog page 2 97, blog list 94–97, case study 92–93, post 92–93. Performance sits
+at or just under the floor on the content-heavy routes. `--report-only` downgrades the three
+score thresholds to warnings for exactly this reason; CI does not pass it, and M8's run
+against the deployed site is the authoritative reading.
 
 Practices: `next/image` with AVIF + WebP and explicit dimensions on everything; every
 below-fold image `loading="lazy"`; fonts self-hosted, subset, preloaded, `swap`; heavy

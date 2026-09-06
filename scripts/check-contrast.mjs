@@ -6,6 +6,13 @@
  * without adding its assertion here leaves it unverified, which is the failure
  * mode this exists to prevent.
  *
+ * IT UNDERSTANDS TRANSLUCENT BACKGROUNDS, and it has to. --accent-quiet is an
+ * rgba() tint, and the tag chips set --accent-text on top of it. Until M7 this
+ * script only parsed opaque hex, so that pair was invisible to it: the text
+ * passed against --base at 4.96:1 while the composited reality was 4.46:1, and
+ * it took scripts/check-a11y.mjs to find it. A pair whose background has alpha
+ * is composited over its own `over` base before the ratio is taken.
+ *
  * Run: npm run check:contrast
  */
 import { readFileSync } from "node:fs"
@@ -25,10 +32,30 @@ function parseBlock(selector) {
   const body = css.slice(open + 1, end)
 
   const tokens = {}
-  for (const [, name, hex] of body.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,8})\s*;/g)) {
-    tokens[name] = hex
+  for (const [, name, value] of body.matchAll(
+    /--([\w-]+):\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))\s*;/g,
+  )) {
+    tokens[name] = value
   }
   return tokens
+}
+
+/** `#rgb`, `#rrggbb` or `rgba(r, g, b, a)` -> `{ rgb: [r,g,b], alpha }`. */
+function parseColor(value) {
+  const fn = value.match(/^rgba?\(([^)]*)\)$/)
+  if (fn) {
+    const parts = fn[1].split(",").map((n) => parseFloat(n.trim()))
+    return { rgb: parts.slice(0, 3), alpha: parts.length > 3 ? parts[3] : 1 }
+  }
+  let h = value.slice(1)
+  if (h.length === 3) h = [...h].map((c) => c + c).join("")
+  if (h.length !== 6) throw new Error(`Unsupported color: ${value}`)
+  return { rgb: [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)), alpha: 1 }
+}
+
+/** Source-over composite. What the eye actually sees, and what axe measures. */
+function composite(fg, bg) {
+  return fg.rgb.map((c, i) => c * fg.alpha + bg.rgb[i] * (1 - fg.alpha))
 }
 
 function srgbToLinear(channel) {
@@ -36,16 +63,13 @@ function srgbToLinear(channel) {
   return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
 }
 
-function luminance(hex) {
-  let h = hex.slice(1)
-  if (h.length === 3) h = [...h].map((c) => c + c).join("")
-  if (h.length !== 6) throw new Error(`Unsupported hex (alpha not allowed in pairs): ${hex}`)
-  const [r, g, b] = [0, 2, 4].map((i) => srgbToLinear(parseInt(h.slice(i, i + 2), 16)))
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+function luminance([r, g, b]) {
+  const [lr, lg, lb] = [r, g, b].map(srgbToLinear)
+  return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb
 }
 
-function ratio(fg, bg) {
-  const [a, b] = [luminance(fg), luminance(bg)].sort((x, y) => y - x)
+function ratio(fgRgb, bgRgb) {
+  const [a, b] = [luminance(fgRgb), luminance(bgRgb)].sort((x, y) => y - x)
   return (a + 0.05) / (b + 0.05)
 }
 
@@ -60,6 +84,8 @@ const themes = {
  *             token exists. If this ever starts passing, the substitute is
  *             redundant and the design system should say so.
  * info     — reported, not enforced (WCAG exempts disabled controls).
+ * over     — required when `bg` is translucent: the opaque token underneath it.
+ *             Omitting it on an rgba background is what hid the chip failure.
  */
 const PAIRS = [
   { theme: "dark", fg: "ink", bg: "base", min: 4.5 },
@@ -73,6 +99,11 @@ const PAIRS = [
   { theme: "dark", fg: "on-accent", bg: "accent", min: 4.5 },
   { theme: "dark", fg: "border", bg: "base", min: 1.2 },
   { theme: "dark", fg: "ink-faint", bg: "base", info: true },
+  /* The tag chips. --accent-quiet has alpha, so it is composited over `over`
+     first — see the docblock; this is the pair axe found and this script could
+     not previously express. */
+  { theme: "dark", fg: "accent-text", bg: "accent-quiet", over: "base", min: 4.5 },
+  { theme: "dark", fg: "accent-text", bg: "accent-quiet", over: "surface", min: 4.5 },
 
   { theme: "light", fg: "ink", bg: "base", min: 4.5 },
   { theme: "light", fg: "ink", bg: "surface", min: 4.5 },
@@ -83,6 +114,8 @@ const PAIRS = [
   { theme: "light", fg: "on-accent", bg: "accent", min: 4.5 },
   { theme: "light", fg: "border", bg: "base", min: 1.05 },
   { theme: "light", fg: "ink-faint", bg: "base", info: true },
+  { theme: "light", fg: "accent-text", bg: "accent-quiet", over: "base", min: 4.5 },
+  { theme: "light", fg: "accent-text", bg: "accent-quiet", over: "surface", min: 4.5 },
 
   // Why --accent-text exists in light mode. See design-system.md §1.2.
   { theme: "light", fg: "accent", bg: "base", forbidden: true },
@@ -102,9 +135,19 @@ for (const pair of PAIRS) {
     continue
   }
 
-  const r = ratio(fg, bg)
+  const bgColor = parseColor(bg)
+  if (bgColor.alpha < 1 && !pair.over) {
+    console.error(`FAIL  ${pair.theme}: --${pair.bg} is translucent and the pair names no \`over\``)
+    failed++
+    continue
+  }
+
+  const bgRgb =
+    bgColor.alpha < 1 ? composite(bgColor, parseColor(tokens[pair.over])) : bgColor.rgb
+  const r = ratio(parseColor(fg).rgb, bgRgb)
   const shown = r.toFixed(2).padStart(6)
-  const label = `${pair.theme.padEnd(5)} ${pair.fg} on ${pair.bg}`
+  const label =
+    `${pair.theme.padEnd(5)} ${pair.fg} on ${pair.bg}` + (pair.over ? ` over ${pair.over}` : "")
 
   if (pair.info) {
     console.log(`info  ${shown}:1  ${label}  (disabled state, WCAG exempt)`)

@@ -10,8 +10,14 @@
  * the homepage or to another persona, and no shipped client chunk names a
  * reserved code. Everything else here is ordinary route acceptance.
  *
- *   npm run build && npm start
+ *   npm run build && npx next start
  *   node tests/persona.mjs
+ *
+ * `npx next start`, NOT `npm start`. next.config.mjs sets output "standalone"
+ * and next start warns the two do not work together — measured, they do, since
+ * every route here is prerendered. The alternative, node
+ * .next/standalone/server.js, first needs .next/static and public/ copied in
+ * beside it. CI runs the command written above.
  */
 import { existsSync } from "node:fs"
 
@@ -30,7 +36,7 @@ const RESERVED = ["cst", "cc", "pm", "dsn"]
 
 /*
   Stale-server guard — same fingerprint as tests/homepage.mjs, and for the same
-  reason: a stale `npm start` answers 200 while serving a .next that has been
+  reason: a stale `npx next start` answers 200 while serving a .next that has been
   overwritten, and every assertion below then reports on a page that no longer
   exists. Asset existence is the fingerprint because the App Router emits no
   build id into the HTML.
@@ -38,7 +44,7 @@ const RESERVED = ["cst", "cc", "pm", "dsn"]
 {
   const res = await fetch(ORIGIN + "/" + BUILT).catch(() => null)
   if (!res?.ok) {
-    console.error("\nNo server at " + ORIGIN + " — run `npm run build && npm start` first.")
+    console.error("\nNo server at " + ORIGIN + " — run `npm run build && npx next start` first.")
     process.exit(1)
   }
   const assets = [...new Set((await res.text()).match(/\/_next\/static\/[^"']+/g) ?? [])]
@@ -56,7 +62,7 @@ const RESERVED = ["cst", "cc", "pm", "dsn"]
         assets.length +
         " served assets are absent from .next — e.g. " +
         missing[0] +
-        "\nKill the process on :3000 and restart `npm start`.",
+        "\nKill the process on :3000 and restart `npx next start`.",
     )
     process.exit(1)
   }
@@ -163,16 +169,30 @@ console.log("\n[isolation · bundle]")
   ok(chunks.length > 0, "found " + chunks.length + " client chunks to scan")
 
   const leaked = []
+  /*
+    THREE.JS IS NOT SHIPPED YET AND THIS ASSERTION IS STILL LOAD-BEARING.
+    design-system.md §7 requires that the M9 WebGL hero never mount under
+    prefers-reduced-motion, and §8 caps First Load JS at 200 kB — a three.js
+    build is ~150 kB gzipped on its own. Written now, this fails the moment
+    the renderer is imported statically instead of behind the dynamic,
+    motion-gated import M9 specifies, which is the one way it can go wrong.
+  */
+  const webgl = []
   for (const chunk of chunks) {
     const body = await (await fetch(ORIGIN + chunk)).text()
     for (const code of RESERVED) {
       // Quoted, as it would appear in an inlined array of codes.
       if (new RegExp("[\"'`]" + code + "[\"'`]").test(body)) leaked.push(code + " in " + chunk)
     }
+    if (/\bTHREE\b|three\.module|WebGLRenderer/.test(body)) webgl.push(chunk)
   }
   ok(
     leaked.length === 0,
     "no reserved code in any client chunk" + (leaked.length ? ": " + leaked.join(", ") : ""),
+  )
+  ok(
+    webgl.length === 0,
+    "no WebGL runtime in the initial chunks" + (webgl.length ? ": " + webgl.join(", ") : ""),
   )
 }
 

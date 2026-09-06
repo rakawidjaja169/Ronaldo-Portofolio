@@ -11,8 +11,15 @@
  * runnable on its own so M1 has an executable acceptance record rather than
  * a paragraph claiming one.
  *
- *   npm run build && npm start
+ *   npm run build && npx next start
  *   node tests/homepage.mjs
+ *
+ * `npx next start`, NOT `npm start`. next.config.mjs sets output "standalone"
+ * and next start prints a warning saying the two do not work together —
+ * measured, they do: every route here is prerendered, so nothing depends on
+ * the standalone runtime. The alternative, node .next/standalone/server.js,
+ * first needs .next/static and public/ copied in beside it. CI runs the
+ * command written above.
  */
 import { existsSync } from "node:fs"
 
@@ -26,7 +33,7 @@ const ACCENT_RGB = "rgb(255, 145, 77)"
 /*
   Fail fast if the running server is not the build on disk.
 
-  A stale `npm start` left on :3000 keeps answering 200 while serving a .next
+  A stale `npx next start` left on :3000 keeps answering 200 while serving a .next
   that has since been overwritten — layout is silently wrong (a 44px control
   measures 36px, an image fills the viewport) and every assertion below then
   reports on a page that no longer exists. This has cost two debugging
@@ -39,7 +46,7 @@ const ACCENT_RGB = "rgb(255, 145, 77)"
 {
   const res = await fetch(URL).catch(() => null)
   if (!res?.ok) {
-    console.error("\nNo server at " + URL + " — run `npm run build && npm start` first.")
+    console.error("\nNo server at " + URL + " — run `npm run build && npx next start` first.")
     process.exit(1)
   }
   const assets = [...new Set((await res.text()).match(/\/_next\/static\/[^"']+/g) ?? [])]
@@ -52,7 +59,7 @@ const ACCENT_RGB = "rgb(255, 145, 77)"
     console.error(
       "\nStale server: " + missing.length + " of " + assets.length +
         " served assets are absent from .next — e.g. " + missing[0] + "\n" +
-        "Kill the process on :3000 and restart `npm start`.",
+        "Kill the process on :3000 and restart `npx next start`.",
     )
     process.exit(1)
   }
@@ -134,6 +141,39 @@ const ok = (c, m) => (c ? console.log("  PASS " + m) : (fail.push(m), console.lo
   await p.reload({ waitUntil: "commit" })
   const atCommit = await p.evaluate(() => document.documentElement.getAttribute("data-theme"))
   ok(atCommit === "light", `no flash: data-theme is "${atCommit}" before paint`)
+
+  /*
+    The other direction, which the reload above cannot prove: with no stored
+    choice the default is dark, and it stays dark even when the OS asks for
+    light. The first assertion runs in this dark-scheme context, so it would
+    pass either way — it is setup. The second one, under
+    `prefers-color-scheme: light`, is the assertion: a matchMedia fallback
+    creeping into the pre-paint script produces "light" there and fails.
+  */
+  await p.evaluate(() => localStorage.removeItem("theme"))
+  await p.reload({ waitUntil: "commit" })
+  ok(
+    (await p.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "dark",
+    "cleared storage: back to the dark default",
+  )
+  await ctx.close()
+
+  const lightCtx = await b.newContext({ colorScheme: "light" })
+  const lp = await lightCtx.newPage()
+  /*
+    `domcontentloaded`, not `commit`. `commit` resolves as soon as the
+    navigation is committed, which on a cold context can land BEFORE the
+    inline <head> script has run — the attribute reads null and the assertion
+    fails for a reason that has nothing to do with the theme. The no-flash
+    check above can use `commit` because it reloads a warm page. What matters
+    here is only that the value is settled before hydration, and
+    domcontentloaded is that point.
+  */
+  await lp.goto(URL, { waitUntil: "domcontentloaded" })
+  ok(
+    (await lp.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "dark",
+    "dark default holds under prefers-color-scheme: light",
+  )
   await b.close()
 }
 
@@ -197,6 +237,60 @@ for (const theme of ["dark", "light"]) {
     console.log(`    ${w}px portrait ${Math.round(box.width)}x${Math.round(box.height)}`)
     await p.close()
   }
+  await b.close()
+}
+
+/*
+  6. Isolation, homepage side — product.md §2.1.
+
+  tests/persona.mjs proves a persona route never links out. NOTHING HAS EVER
+  PROVEN THE HOMEPAGE DOES NOT LINK IN, and that is the same guarantee read
+  from the other end: one `<a href="/swe">` in a footer defeats §2 exactly as
+  completely as a persona linking home does.
+
+  CODES ARE HARDCODED, not imported from content/personas.ts — the rule that
+  file's own docblock sets out and tests/persona.mjs:23 states: a check that
+  reads the same source as the code under test cannot catch that source being
+  wrong. The cost is that a sixth code added there is invisible here, which is
+  the trade this repo has already made everywhere else it hardcodes "swe".
+
+  Every href is resolved through `a.href` before its first segment is read, so
+  a relative "swe", a "./swe" and an absolute URL all normalise first.
+*/
+{
+  const CODES = ["swe", "cst", "cc", "pm", "dsn"]
+  const b = await chromium.launch()
+  const p = await b.newPage()
+  await p.goto(URL, { waitUntil: "networkidle" })
+  console.log("\n[isolation · homepage]")
+
+  /* `seg` is computed IN THE PAGE, not here: this module's own `URL` const is
+     the base address under test and shadows the global URL constructor, so
+     `new URL(...)` in Node scope is a TypeError. The anchor element has
+     already resolved the href for us anyway — a.pathname is the answer. */
+  const links = await p.evaluate(() =>
+    [...document.querySelectorAll("a[href]")].map((a) => ({
+      raw: a.getAttribute("href"),
+      seg: a.pathname.split("/").filter(Boolean)[0] ?? null,
+      sameOrigin: a.origin === location.origin,
+      text: (a.textContent ?? "").trim().slice(0, 40),
+    })),
+  )
+  /* An empty page passes every filter below. This is the assertion that the
+     sweep ran at all — the vacuous-pass failure M5 turned up once already. */
+  ok(links.length > 0, links.length + " links found")
+
+  const leaks = links.filter((l) => l.sameOrigin && l.seg !== null && CODES.includes(l.seg))
+  for (const l of leaks) console.log(`    leak: ${l.raw}  "${l.text}"`)
+  ok(leaks.length === 0, "no link on / resolves to a persona route")
+
+  /* And against the served markup, which the DOM sweep cannot see: a persona
+     path sitting in a data attribute, a JSON-LD block or a preload hint is not
+     an anchor, is not clickable, and is still the address written down. */
+  const html = await (await fetch(URL)).text()
+  const inHtml = CODES.filter((c) => new RegExp('/' + c + '(?:[/"#?])').test(html))
+  ok(inHtml.length === 0, "no persona path in the served HTML" + (inHtml.length ? ": " + inHtml : ""))
+
   await b.close()
 }
 

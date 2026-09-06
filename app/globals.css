@@ -51,8 +51,16 @@
   --accent: #ff914d;
   /* #ff914d on #fafafa is 2.1:1 and FAILS AA for text. In light mode the raw
      accent is permitted for fills, borders, and display type >= 24px bold only;
-     anything at body size must use --accent-text. */
-  --accent-text: #c2410c;
+     anything at body size must use --accent-text.
+
+     #b03c0b, NOT #c2410c. The tag chips set this colour on --accent-quiet, and
+     that token is a translucent accent tint: composited over --base it lifts
+     the background to rgb(251,235,226), which pulled #c2410c down to 4.46:1 —
+     a real AA failure that scripts/check-contrast.mjs could not see, because it
+     compares opaque hex pairs and --accent-quiet has an alpha channel. Found by
+     scripts/check-a11y.mjs on its first run, on five of fourteen route/theme
+     pairs. The composited assertions now live in the contrast gate too. */
+  --accent-text: #b03c0b;
   --accent-hover: #f97316;
   --accent-quiet: rgba(255, 145, 77, 0.14);
   /* Identical to dark: the accent fill it sits on does not invert. */
