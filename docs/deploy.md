@@ -182,20 +182,46 @@ surface and more configuration for the same result.
    | Subdomain | `deploy` |
    | Domain | `rakawidjaja.com` |
    | Service type | `HTTP` |
-   | URL | `dokploy:3000` |
+   | URL | `host.docker.internal:3000` |
 
-   `dokploy` is the panel's container name on Dokploy's Docker network, which `cloudflared`
-   joins by being deployed as a Dokploy app. The DNS record is created for you.
+   **The origin URL depends on how `cloudflared` was installed**, and getting it wrong is
+   the difference between a 200 and a 502:
+
+   | Install | Origin URL |
+   | --- | --- |
+   | Plain `docker run` with `--add-host=host.docker.internal:host-gateway` (what is deployed) | `host.docker.internal:3000` |
+   | Dokploy application, on Dokploy's own Docker network | `dokploy:3000` |
+   | `cloudflared service install` on the host itself | `localhost:3000` |
+
+   **A `deploy` DNS record must not already exist.** Adding the public hostname creates a
+   CNAME to `<tunnel-uuid>.cfargotunnel.com`; a pre-existing A record wins and the name keeps
+   resolving to the private address, which looks exactly like a tunnel that never came up.
+   Delete the old record first.
 3. SSL/TLS mode: **Full**. Not Flexible — it produces redirect loops against Traefik.
 
-**In Dokploy**, deploy `cloudflared` as an application:
+**The connector is already running** on the Dokploy VM (192.168.0.22), installed 2026-09-06 as
+a plain container so it survives a Dokploy reinstall and does not depend on the panel it exists
+to reach:
 
-| Field | Value |
-| --- | --- |
-| Provider | Docker |
-| Image | `cloudflare/cloudflared` |
-| Environment | `TUNNEL_TOKEN=<the token>` |
-| Advanced -> Arguments | `tunnel`, `run` |
+```sh
+docker run -d --name cloudflared --restart=always \
+  --add-host=host.docker.internal:host-gateway \
+  cloudflare/cloudflared:latest tunnel --no-autoupdate run --token <token>
+```
+
+Four `Registered tunnel connection` lines (connIndex 0-3) is a healthy connector. `cloudflared-memora`
+on the same host is a different tunnel for a different project — leave it alone.
+
+**Reaching that VM.** It has no SSH key that this workstation holds, and its Docker socket is not
+exposed. The way in is the Proxmox hypervisor at `192.168.0.10` (`pve`, key `id_ed25519_proxmox`),
+where `dokploy` is **VMID 202** with the QEMU guest agent enabled:
+
+```sh
+ssh root@192.168.0.10 'qm guest exec 202 -- /bin/sh -c "<command>"'
+```
+
+That runs as root inside the VM and returns JSON with an `out-data` field. Use it for anything
+the panel cannot do.
 
 **In the app being deployed:** General -> Auto Deploy on, branch set to the branch you push.
 
